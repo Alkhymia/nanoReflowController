@@ -49,4 +49,4 @@ enum
 // other PDQ library options
 #define ST7735_SAVE_SPCR  1     // <= 0/1 with 1 to save/restore AVR SPI control register (to "play nice" when other SPI use)
 
-#endif // PDQ_ST7735_CONFIG
+#endif // PDQ_ST7735_CONFIG_H

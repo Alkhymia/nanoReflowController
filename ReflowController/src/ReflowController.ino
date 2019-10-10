@@ -435,9 +435,7 @@ void loop(void)
     uint32_t deltaT = zeroCrossTicks - lastUpdate;
     lastUpdate = zeroCrossTicks;
 
-
     readThermocouple(); // should be sufficient to read it every 250ms or 500ms   
-
 
     if (tcStat > 0) {
       thermocoupleErrorCount++;

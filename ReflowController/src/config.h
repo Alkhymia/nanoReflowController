@@ -1,8 +1,6 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-
-
 //#define ALWAYS_FIRST_RUN
 //#define FAKE_HW 1
 //#define PIDTUNE 1 // autotune wouldn't fit in the 28k available on my arduino pro micro.
@@ -16,24 +14,24 @@
 //#define MAINS_60HZ true // define this if your power is 60hz for proper timing otherwise comment out this line for 50hz
 #define MAINS_50HZ true // define this if your power is 60hz for proper timing otherwise comment out this line for 50hz
 
-
-
 // ----------------------------------------------------------------------------
 
 #define WITH_SPLASH 1
 
-
+// --- LCD
 static const uint8_t PIN_LCD_CS   = 10;
 static const uint8_t PIN_LCD_DC   = 9;
 static const uint8_t PIN_LCD_RST  = 8;
 static const uint8_t LCD_ROTATION = 3; // 0/2-> portrait, 1/3-> landscape
 
+// --- thermocouple
 static const uint8_t PIN_TC_CS   = A1;
 static const uint8_t PIN_TC_DO   = 12;
 static const uint8_t PIN_TC_CLK  = 13;
 static const uint8_t PIN_HEATER = 3; // 
 static const uint8_t PIN_FAN    = A0; // 
 static const uint8_t PIN_BEEPER = A5; // Beeper Out
+
 // --- encoder
 static const uint8_t PIN_ENC_A           = A2; // 
 static const uint8_t PIN_ENC_B           = A3; // 
@@ -50,8 +48,6 @@ static const uint8_t NUM_TEMP_READINGS  = 5;
 static const uint8_t TC_ERROR_TOLERANCE = 5; // allow for n consecutive errors due to noisy power supply before bailing out
 static const float   TEMP_COMPENSATION  = 1.0; // correction factor to match temperature measured with other device
 
-
-
 // see: https://www.compuphase.com/electronics/reflowsolderprofiles.htm  
 static const uint8_t DEFAULT_SOAK_TEPM_A      = 110;
 static const uint8_t DEFAULT_SOAK_TEPM_B      = 160; 
@@ -61,7 +57,6 @@ static const uint8_t DEFAULT_PEAK_DURATION    = 15;
 static const float DEFAULT_RAMP_UP_RATE       = 1.2; // degrees / second (keep it about 1/2 of maximum to prevent PID overshooting)
 static const float DEFAULT_RAMP_DOWN_RATE     = 2.0; // degrees / second
 static const uint8_t FACTORY_FAN_ASSIST_SPEED = 33;
-
 
 /*
 Kp: Determines how aggressively the PID reacts to the current amount of error (Proportional) (double >=0)
@@ -85,9 +80,5 @@ Experimental method to tune PID:
 #define FACTORY_KP  1.75 // 1.75 //4.0 
 #define FACTORY_KI 0.03 // 0.03 // 0.05 
 #define FACTORY_KD 3.0 //3.0//2.0 
-
-
-
-
 
 #endif // CONFIG_H

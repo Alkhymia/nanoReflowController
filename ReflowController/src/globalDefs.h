@@ -7,17 +7,16 @@
 #ifdef MAINS_50HZ 
   static const uint8_t DEFAULT_LOOP_DELAY = 89;  // should be about 16% less for 60Hz mains
   static const uint8_t TICKS_PER_SEC      = 100; // for 50Hz mains:  2*50Hz = 100 ticks per second
-#else ifdef MAINS_60HZ
+#endif
+#ifdef MAINS_60HZ
   static const uint8_t DEFAULT_LOOP_DELAY = 74;  // 60Hz mains = 74?
   static const uint8_t TICKS_PER_SEC      = 120; // for 60Hz mains:  2*60Hz = 120 ticks per second
 #endif
 
-static const uint8_t TICKS_PER_UPDATE     = 25; // 
+static const uint8_t TICKS_PER_UPDATE     = 50; // 25 makes my MAX6675 keeps outputting the same value even when temperature changes
 static const uint8_t TICKS_TO_REDRAW      = 50; // 
 
 const char * ver = "3.2";
-
-
 
 double temperature;
 uint8_t tcStat = 0;
@@ -37,7 +36,7 @@ typedef struct {
   double Kd;
 } PID_t;
 
-PID_t heaterPID = { FACTORY_KP, FACTORY_KI,  FACTORY_KD };
+PID_t heaterPID = { FACTORY_KP, FACTORY_KI, FACTORY_KD };
 //PID_t heaterPID = { 4.00, 0.05,  2.00 };
 PID_t fanPID    = { 1.00, 0.00, 0.00 };
 
@@ -102,5 +101,4 @@ void makeDefaultProfile() {
 }
 
 
-
-#endif GLOBAL_DEFS_H
+#endif // GLOBAL_DEFS_H

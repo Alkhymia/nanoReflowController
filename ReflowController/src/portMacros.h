@@ -21,4 +21,4 @@
 #define isLow(P)((*(pinOfPin(P))& pinMask(P))==0)
 #define digitalState(P)((uint8_t)isHigh(P))
 
-#endif // PORT_MACROS
+#endif // PORT_MACROS_H
