@@ -52,10 +52,7 @@ unsigned int aTuneLookBack = 30;
 #endif
 
 /*************************************/
-
-
 /*************************************/
-
 
 typedef struct {
   double temp;
@@ -71,7 +68,6 @@ double totalT1 = 0;             // the running total
 double averageT1 = 0;           // the average
 uint8_t index = 0;              // the index of the current reading
 uint8_t thermocoupleErrorCount;
-
 
 // ----------------------------------------------------------------------------
 // Ensure that Solid State Relais are off when starting
@@ -223,12 +219,10 @@ void abortWithError(int error) {
 void setup() {
 #ifdef SERIAL_VERBOSE
   Serial.begin(115200);
-  Serial.println("Reflow controller started");
+  Serial.println("nano Reflow controller started");
 #endif
   
-  setupPins();
-  
- 
+  setupPins(); 
   setupTFT();
 
   if (firstRun()) {
@@ -238,10 +232,6 @@ void setup() {
   else {
     loadLastUsedProfile();
   }
-
-
-
-  
  
   do {
     // wait for MAX chip to stabilize
@@ -249,7 +239,6 @@ void setup() {
    readThermocouple();
   }
   while ((tcStat > 0) && (thermocoupleErrorCount++ < TC_ERROR_TOLERANCE));
-    
 
   if ((tcStat != 0) || (thermocoupleErrorCount  >= TC_ERROR_TOLERANCE)) {
     abortWithError(tcStat);
@@ -277,7 +266,6 @@ void setup() {
 #ifdef WITH_SPLASH
   displaySplash();
 #endif
-
 
 #ifdef WITH_CALIBRATION
   tft.setCursor(7, 99);  
@@ -562,7 +550,7 @@ void loop(void)
           PID.SetTunings(fanPID.Kp, fanPID.Ki, fanPID.Kd);
           Setpoint = activeProfile.peakTemp - 15; // get it all going with a bit of a kick! v sluggish here otherwise, too hot too long
 #ifdef WITH_BEEPER
-            tone(PIN_BEEPER,BEEP_FREQ,3000);  // Beep as a reminder that CoolDown starts (and maybe open up the oven door for fast enough cooldown)
+          tone(PIN_BEEPER, BEEP_FREQ, 3000);  // Beep as a reminder that CoolDown starts (and maybe open up the oven door for fast enough cooldown)
 #endif
 #ifdef WITH_SERVO       
           // TODO: implement servo operated lid
@@ -582,7 +570,6 @@ void loop(void)
           PID.SetControllerDirection(REVERSE);
           PID.SetTunings(fanPID.Kp, fanPID.Ki, fanPID.Kd);
           Setpoint = idleTemp;
-
         }
 
         if (Input < (idleTemp + 5)) {
@@ -590,20 +577,20 @@ void loop(void)
           PID.SetMode(MANUAL);
           Output = 0;
           #ifdef WITH_BEEPER
-            tone(PIN_BEEPER,BEEP_FREQ,500);  //End Beep
+            tone(PIN_BEEPER, BEEP_FREQ, 500);  //End Beep
             delay(1500);
-            tone(PIN_BEEPER,BEEP_FREQ,500);
+            tone(PIN_BEEPER, BEEP_FREQ, 500);
             delay(1500);
-            tone(PIN_BEEPER,BEEP_FREQ,1500);
+            tone(PIN_BEEPER, BEEP_FREQ, 1500);
           #endif
         }
 
 #ifdef PIDTUNE
       case Tune:
         {
-          Setpoint = 210.0;
+          Setpoint = 220.0;
           int8_t val = PIDTune.Runtime();
-         // PIDTune.setpoint = 210.0; // is private inside PIDTune
+         // PIDTune.setpoint = 220.0; // is private inside PIDTune
 
           if (val != 0) {
             currentState = CoolDown;
@@ -698,6 +685,3 @@ bool firstRun() {
 #endif
   return true;
 }
-
-
-// ------

@@ -49,11 +49,11 @@ static const uint8_t TC_ERROR_TOLERANCE = 5; // allow for n consecutive errors d
 static const float   TEMP_COMPENSATION  = 1.0; // correction factor to match temperature measured with other device
 
 // see: https://www.compuphase.com/electronics/reflowsolderprofiles.htm  
-static const uint8_t DEFAULT_SOAK_TEPM_A      = 110;
-static const uint8_t DEFAULT_SOAK_TEPM_B      = 160; 
-static const uint8_t DEFAULT_SOAK_DURATION    = 180; 
-static const uint8_t DEFAULT_PEAK_TEPM        = 200;
-static const uint8_t DEFAULT_PEAK_DURATION    = 15;
+static const uint8_t DEFAULT_SOAK_TEPM_A      = 150;
+static const uint8_t DEFAULT_SOAK_TEPM_B      = 165; 
+static const uint8_t DEFAULT_SOAK_DURATION    = 120; 
+static const uint8_t DEFAULT_PEAK_TEPM        = 230;
+static const uint8_t DEFAULT_PEAK_DURATION    = 20;
 static const float DEFAULT_RAMP_UP_RATE       = 1.2; // degrees / second (keep it about 1/2 of maximum to prevent PID overshooting)
 static const float DEFAULT_RAMP_DOWN_RATE     = 2.0; // degrees / second
 static const uint8_t FACTORY_FAN_ASSIST_SPEED = 33;
@@ -77,7 +77,7 @@ Experimental method to tune PID:
 
 */
 #define PID_SAMPLE_TIME 200
-#define FACTORY_KP  1.75 // 1.75 //4.0 
+#define FACTORY_KP  1.75 // 1.75 // 4.0 
 #define FACTORY_KI 0.03 // 0.03 // 0.05 
 #define FACTORY_KD 3.0 //3.0//2.0 
 

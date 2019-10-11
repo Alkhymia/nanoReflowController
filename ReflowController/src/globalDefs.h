@@ -3,7 +3,6 @@
 
 #include "config.h"
 
-
 #ifdef MAINS_50HZ 
   static const uint8_t DEFAULT_LOOP_DELAY = 89;  // should be about 16% less for 60Hz mains
   static const uint8_t TICKS_PER_SEC      = 100; // for 50Hz mains:  2*50Hz = 100 ticks per second

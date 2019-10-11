@@ -31,7 +31,6 @@ void readThermocouple() {
   digitalHigh(PIN_TC_CS); 
 
   if (lcdState == 0) digitalLow(PIN_LCD_CS);
-  else digitalHigh(PIN_LCD_CS);
 
 }
 
