@@ -54,7 +54,6 @@ float pxPerSec;
 float pxPerC;
 uint16_t xOffset; // used for wraparound on x axis
 
-
 void setupTFT() {
 
   FastPin<ST7735_RST_PIN>::setOutput();
@@ -184,12 +183,22 @@ void clearLastMenuItemRenderState() {
 
 // ----------------------------------------------------------------------------
 
-extern const Menu::Item_t miRampUpRate, miRampDnRate, miSoakTime, 
-                          miSoakTempA, miSoakTempB, miPeakTime, miPeakTemp,
-                          miLoadProfile, miSaveProfile,
-                          miPidSettingP, miPidSettingI, miPidSettingD,
-                          miFanSettings;
-
+extern const 
+  Menu::Item_t miRampUpRate,
+    miSoakTempA,
+    miSoakTempB,
+    miSoakTime,
+    miPeakTemp,
+    miPeakTime,
+    miRampDnRate,
+    miLoadProfile,
+    miSaveProfile,
+#ifdef WITH_FAN
+    miFanSettings,
+#endif
+    miPidSettingP,
+    miPidSettingI,
+    miPidSettingD;
 
 // ----------------------------------------------------------------------------
 
@@ -225,8 +234,10 @@ void getItemValuePointer(const Menu::Item_t *mi, double **d, int16_t **i) {
   if (mi == &miPeakTemp)    *i = &activeProfile.peakTemp;
   if (mi == &miPidSettingP) *d = &heaterPID.Kp;
   if (mi == &miPidSettingI) *d = &heaterPID.Ki;
-  if (mi == &miPidSettingD) *d = &heaterPID.Kd; 
+  if (mi == &miPidSettingD) *d = &heaterPID.Kd;
+#ifdef WITH_FAN
   if (mi == &miFanSettings) *i = &fanAssistSpeed;
+#endif
 }
 
 // ----------------------------------------------------------------------------
@@ -266,9 +277,11 @@ bool getItemValueLabel(const Menu::Item_t *mi, char *label) {
     if (mi == &miPeakTime || mi == &miSoakTime) {
       itostr(label, *iValue, "s");
     }
+#ifdef WITH_FAN
     if (mi == &miFanSettings) {
       itostr(label, *iValue, "%");
     }
+#endif
   }
 
   return dValue || iValue;
@@ -343,9 +356,11 @@ bool menu_editNumericalValue(const Menu::Action_t action) {
       if (isPidSetting(MenuEngine.currentItem)) {
         savePID();
       }
+#ifdef WITH_FAN
       else if (MenuEngine.currentItem == &miFanSettings) {
         saveFanSpeed();
       }
+#endif
       // don't autosave profile, so that one can do "save as" without overwriting the current profile
 
       currentState = Settings;
@@ -376,8 +391,10 @@ void factoryReset() {
     saveParameters(i);
   }
 
+#ifdef WITH_FAN
   fanAssistSpeed = FACTORY_FAN_ASSIST_SPEED;
   saveFanSpeed();
+#endif
 
   heaterPID.Kp = FACTORY_KP; // 0.60; 
   heaterPID.Ki = FACTORY_KI; //0.01;
@@ -591,9 +608,14 @@ MenuItem(miEditProfile,   "Edit Profile",   miLoadProfile,  miCycleStart,   miEx
   MenuItem(miPeakTime,    "Peak time",      miRampDnRate,   miPeakTemp,     miEditProfile,  Menu::NullItem, menu_editNumericalValue);
   MenuItem(miRampDnRate,  "Ramp down",      Menu::NullItem, miPeakTime,     miEditProfile,  Menu::NullItem, menu_editNumericalValue);
 MenuItem(miLoadProfile,   "Load Profile",   miSaveProfile,  miEditProfile,  miExit,         Menu::NullItem, menu_saveLoadProfile);
+#ifdef WITH_FAN
 MenuItem(miSaveProfile,   "Save Profile",   miFanSettings,  miLoadProfile,  miExit,         Menu::NullItem, menu_saveLoadProfile);
 MenuItem(miFanSettings,   "Fan Speed",      miPidSettings,  miSaveProfile,  miExit,         Menu::NullItem, menu_editNumericalValue);
 MenuItem(miPidSettings,   "PID Settings",   miFactoryReset, miFanSettings,  miExit,         miPidSettingP,  menuDummy);
+#else
+MenuItem(miSaveProfile,   "Save Profile",   miPidSettings,  miLoadProfile,  miExit,         Menu::NullItem, menu_saveLoadProfile);
+MenuItem(miPidSettings,   "PID Settings",   miFactoryReset, miSaveProfile,  miExit,         miPidSettingP,  menuDummy);
+#endif
   MenuItem(miPidSettingP, "Heater Kp",      miPidSettingI,  Menu::NullItem, miPidSettings,  Menu::NullItem, menu_editNumericalValue);
   MenuItem(miPidSettingI, "Heater Ki",      miPidSettingD,  miPidSettingP,  miPidSettings,  Menu::NullItem, menu_editNumericalValue);
   MenuItem(miPidSettingD, "Heater Kd",      Menu::NullItem, miPidSettingI,  miPidSettings,  Menu::NullItem, menu_editNumericalValue);
@@ -746,10 +768,12 @@ void updateProcessDisplay() {
   tft.print((int)heaterValue);
   tft.print('%');
 
+#ifdef WITH_FAN
   tft.print(" \x2a");
   alignRightPrefix((int)fanValue); 
   tft.print((int)fanValue);
   tft.print('%');
+#endif
 
   tft.print(" \x12 "); // alternative: \x7f
   printDouble(rampRate);

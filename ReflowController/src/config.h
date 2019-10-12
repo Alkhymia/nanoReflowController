@@ -5,14 +5,14 @@
 //#define FAKE_HW 1
 //#define PIDTUNE 1 // autotune wouldn't fit in the 28k available on my arduino pro micro.
 #define WITH_BEEPER // Enables Beeper
-//#define WITH_SERVO // Enables Lid opening Servo (not yet implemented)
-//#define SERIAL_VERBOSE
+//#define WITH_FAN    // Enables Fan
+//#define WITH_SERVO  // Enables Lid opening Servo (not yet implemented)
+#define SERIAL_VERBOSE
 
 // run a calibration loop that measures how many timer ticks occur between 2 zero corssings
 // FIXME: does not work reliably at the moment, so a oscilloscope-determined value is used.
 //#define WITH_CALIBRATION 1 // loop timing calibration
-//#define MAINS_60HZ true // define this if your power is 60hz for proper timing otherwise comment out this line for 50hz
-#define MAINS_50HZ true // define this if your power is 60hz for proper timing otherwise comment out this line for 50hz
+#define MAINS_FREQ 50 // set the mains frequency to the proper value for your region
 
 // ----------------------------------------------------------------------------
 
@@ -24,13 +24,17 @@ static const uint8_t PIN_LCD_DC   = 9;
 static const uint8_t PIN_LCD_RST  = 8;
 static const uint8_t LCD_ROTATION = 3; // 0/2-> portrait, 1/3-> landscape
 
-// --- thermocouple
+// --- Thermocouple
 static const uint8_t PIN_TC_CS   = A1;
 static const uint8_t PIN_TC_DO   = 12;
 static const uint8_t PIN_TC_CLK  = 13;
-static const uint8_t PIN_HEATER = 3; // 
-static const uint8_t PIN_FAN    = A0; // 
-static const uint8_t PIN_BEEPER = A5; // Beeper Out
+static const uint8_t PIN_HEATER  = 3;  // Heater Out
+#ifdef WITH_FAN
+  static const uint8_t PIN_FAN     = A0; // Fan Out
+#endif
+#ifdef WITH_BEEPER
+  static const uint8_t PIN_BEEPER  = A5; // Beeper Out
+#endif
 
 // --- encoder
 static const uint8_t PIN_ENC_A           = A2; // 
@@ -45,7 +49,7 @@ static const uint8_t PIN_ZX = 2; // pin for zero crossing detector
 static const uint8_t INT_ZX = digitalPinToInterrupt(PIN_ZX); // interrupt for zero crossing detector
 
 static const uint8_t NUM_TEMP_READINGS  = 5;
-static const uint8_t TC_ERROR_TOLERANCE = 5; // allow for n consecutive errors due to noisy power supply before bailing out
+static const uint8_t TC_ERROR_TOLERANCE = 5;   // allow for n consecutive errors due to noisy power supply before bailing out
 static const float   TEMP_COMPENSATION  = 1.0; // correction factor to match temperature measured with other device
 
 // see: https://www.compuphase.com/electronics/reflowsolderprofiles.htm  

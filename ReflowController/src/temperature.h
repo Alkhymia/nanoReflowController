@@ -25,8 +25,9 @@ void readThermocouple() {
   }
   
 #ifdef SERIAL_VERBOSE
-       Serial.print("temp: ");
-       Serial.println(round(temperature));
+  Serial.print("Temperature: ");
+  Serial.print(temperature);
+  Serial.println(" °C");
 #endif
   digitalHigh(PIN_TC_CS); 
 
