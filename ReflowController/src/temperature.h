@@ -29,7 +29,7 @@ void readThermocouple() {
   Serial.print(temperature);
   Serial.println(" °C");
 #endif
-  digitalHigh(PIN_TC_CS); 
+  digitalHigh(PIN_TC_CS);
 
   if (lcdState == 0) digitalLow(PIN_LCD_CS);
 

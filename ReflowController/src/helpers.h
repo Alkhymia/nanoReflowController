@@ -6,7 +6,7 @@
 #include <Arduino.h>
 
 // ----------------------------------------------------------------------------
-// 
+//
 
 class ScopedTimer {
 public:
@@ -42,10 +42,6 @@ long lpow(int base, int exponent) {
   }
   return result;
 }
-
-//double round(double x) {
-//    return (x >= 0.0) ? floor(x + 0.5) : ceil(x - 0.5);
-//}
 
 // ----------------------------------------------------------------------------
 

@@ -24,6 +24,7 @@
 #include "globalDefs.h"
 
 #ifdef PIDTUNE
+  #undef LIBRARY_VERSION // PID_v1 and PID_AutoTune librarys share the same define
   #include <PID_AutoTune_v0.h>
 #endif
 
@@ -39,8 +40,7 @@ bool     stateChanged      = false;
 uint32_t stateChangedTicks = 0;
 // ----------------------------------------------------------------------------
 // PID
-
-PID PID(&Input, &Output, &Setpoint, heaterPID.Kp, heaterPID.Ki, heaterPID.Kd, DIRECT);
+PID myPID(&Input, &Output, &Setpoint, heaterPID.Kp, heaterPID.Ki, heaterPID.Kd, DIRECT);
 
 #ifdef PIDTUNE
   PID_ATune PIDTune(&Input, &Output);
@@ -113,7 +113,7 @@ digitalHigh(PIN_HEATER);
 typedef struct Channel_s {
   volatile uint8_t target; // percentage of on-time
   uint8_t state;           // current state counter
-  int32_t next;            // when the next change in output shall occur  
+  uint32_t next;            // when the next change in output shall occur  
   bool action;             // hi/lo active
   uint8_t pin;             // io pin of solid state relais
 } Channel_t;
@@ -271,9 +271,9 @@ void setup() {
 #endif
   loadPID();
 
-  PID.SetOutputLimits(0, 100); // max output 100%
-  PID.SetSampleTime(PID_SAMPLE_TIME);
-  PID.SetMode(AUTOMATIC);
+  myPID.SetOutputLimits(0, 100); // max output 100%
+  myPID.SetSampleTime(PID_SAMPLE_TIME);
+  myPID.SetMode(AUTOMATIC);
 
   delay(1000);
 
@@ -404,6 +404,9 @@ void loop(void)
         }
       }
       break;
+
+    default:
+      break;
   }
 
   // --------------------------------------------------------------------------
@@ -506,9 +509,9 @@ void loop(void)
           lastRampTicks = zeroCrossTicks;
           stateChanged = false;
           Output = 50;
-          PID.SetMode(AUTOMATIC);
-          PID.SetControllerDirection(DIRECT);
-          PID.SetTunings(heaterPID.Kp, heaterPID.Ki, heaterPID.Kd);
+          myPID.SetMode(AUTOMATIC);
+          myPID.SetControllerDirection(DIRECT);
+          myPID.SetTunings(heaterPID.Kp, heaterPID.Ki, heaterPID.Kd);
           Setpoint = Input;
           #ifdef WITH_BEEPER
               tone(PIN_BEEPER,BEEP_FREQ,100);
@@ -565,9 +568,9 @@ void loop(void)
         if (stateChanged) {
           stateChanged = false;
           lastRampTicks = zeroCrossTicks;
-          PID.SetControllerDirection(REVERSE);
+          myPID.SetControllerDirection(REVERSE);
 #ifdef WITH_FAN
-          PID.SetTunings(fanPID.Kp, fanPID.Ki, fanPID.Kd);
+          myPID.SetTunings(fanPID.Kp, fanPID.Ki, fanPID.Kd);
 #endif
           Setpoint = activeProfile.peakTemp - 15; // get it all going with a bit of a kick! v sluggish here otherwise, too hot too long
 #ifdef WITH_BEEPER
@@ -588,16 +591,16 @@ void loop(void)
       case CoolDown:
         if (stateChanged) {
           stateChanged = false;
-          PID.SetControllerDirection(REVERSE);
+          myPID.SetControllerDirection(REVERSE);
 #ifdef WITH_FAN
-          PID.SetTunings(fanPID.Kp, fanPID.Ki, fanPID.Kd);
+          myPID.SetTunings(fanPID.Kp, fanPID.Ki, fanPID.Kd);
 #endif
           Setpoint = idleTemp;
         }
 
         if (Input < (idleTemp + 5)) {
           currentState = Complete;
-          PID.SetMode(MANUAL);
+          myPID.SetMode(MANUAL);
           Output = 0;
           #ifdef WITH_BEEPER
             tone(PIN_BEEPER, BEEP_FREQ, 500);  //End Beep
@@ -607,6 +610,7 @@ void loop(void)
             tone(PIN_BEEPER, BEEP_FREQ, 1500);
           #endif
         }
+        break;
 
 #ifdef PIDTUNE
       case Tune:
@@ -633,9 +637,12 @@ void loop(void)
             tft.setCursor(40, 64);
             tft.print("Kd: "); tft.print((uint32_t)(heaterPID.Kd * 100));
           }
+          break;
         }
-        break;
 #endif
+
+      default:
+        break;
     }
   }
 
@@ -647,7 +654,7 @@ void loop(void)
   //if (Input > Setpoint + 50) abortWithError(20); // or 50 degrees hotter, also abort
   
 #ifndef PIDTUNE
-  PID.Compute();
+  myPID.Compute();
 
   // decides which control signal is fed to the output for this cycle
   if (   currentState != RampDown

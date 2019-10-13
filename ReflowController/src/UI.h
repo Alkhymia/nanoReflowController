@@ -272,14 +272,14 @@ bool getItemValueLabel(const Menu::Item_t *mi, char *label) {
   }
   else {
     if (mi == &miPeakTemp || mi == &miSoakTempA || mi == &miSoakTempB ) {
-      itostr(label, *iValue, "\367C");
+      itostr(label, *iValue, (char*)"\367C");
     }
     if (mi == &miPeakTime || mi == &miSoakTime) {
-      itostr(label, *iValue, "s");
+      itostr(label, *iValue, (char*)"s");
     }
 #ifdef WITH_FAN
     if (mi == &miFanSettings) {
-      itostr(label, *iValue, "%");
+      itostr(label, *iValue, (char*)"%");
     }
 #endif
   }
@@ -462,7 +462,8 @@ void saveProfile(unsigned int targetProfile, bool quiet = false);
 
 void loadProfile(unsigned int targetProfile) {
   memoryFeedbackScreen(activeProfileId, true);
-  bool ok = loadParameters(targetProfile);
+  //bool ok = loadParameters(targetProfile);
+  loadParameters(targetProfile);
 
 #if 0
   if (!ok) {
@@ -664,7 +665,7 @@ void drawInitialProcessDisplay()
     Serial.println(pxPerSec);
 #endif   
     // 50°C grid
-    int16_t t = (uint16_t)(activeProfile.peakTemp * TEMPERATURE_WINDOW);
+    uint16_t t = (uint16_t)(activeProfile.peakTemp * TEMPERATURE_WINDOW);
     tft.setTextColor(tft.Color565(0xa0, 0xa0, 0xa0));
     tft.setTextSize(1);
     for (uint16_t tg = 0; tg < t; tg += 50) {
@@ -684,7 +685,7 @@ void updateProcessDisplay() {
 
   uint16_t dx, dy;
   uint8_t y = 2;
-  double tmp;
+//  double tmp;
 
   // header & initial view
   tft.setTextColor(ST7735_WHITE, ST7735_BLUE);
