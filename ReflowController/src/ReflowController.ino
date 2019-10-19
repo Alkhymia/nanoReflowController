@@ -23,11 +23,6 @@
 #include "UI.h"
 #include "globalDefs.h"
 
-#ifdef PIDTUNE
-  #undef LIBRARY_VERSION // PID_v1 and PID_AutoTune librarys share the same define
-  #include <PID_AutoTune_v0.h>
-#endif
-
 // ----------------------------------------------------------------------------
 volatile uint32_t    timerTicks       = 0;
 volatile uint8_t     phaseCounter     = 0;
@@ -41,16 +36,6 @@ uint32_t stateChangedTicks = 0;
 // ----------------------------------------------------------------------------
 // PID
 PID myPID(&Input, &Output, &Setpoint, heaterPID.Kp, heaterPID.Ki, heaterPID.Kd, DIRECT);
-
-#ifdef PIDTUNE
-  PID_ATune PIDTune(&Input, &Output);
-
-  double aTuneStep       =  50,
-         aTuneNoise      =   1,
-         aTuneStartValue =  50; // is set to Output, i.e. 0-100% of Heater
-
-  unsigned int aTuneLookBack = 30;
-#endif
 
 /*************************************/
 /*************************************/
@@ -80,14 +65,14 @@ digitalLow(PIN_HEATER); // off
 #ifdef WITH_FAN
   pinAsOutput(PIN_FAN);
   digitalHigh(PIN_FAN);
-#endif
+#endif // WITH_FAN
 pinAsInputPullUp(PIN_ZX);
 pinAsOutput(PIN_TC_CS);
 pinAsOutput(PIN_LCD_CS);
 pinAsOutput(PIN_TC_CS);
 #ifdef WITH_BEEPER
   pinAsOutput(PIN_BEEPER);
-#endif
+#endif // WITH_BEEPER
 
 }
 // ----------------------------------------------------------------------------
@@ -96,7 +81,7 @@ Timer1.stop();
 detachInterrupt(INT_ZX);
 #ifdef WITH_FAN
   digitalHigh(PIN_FAN);
-#endif
+#endif // WITH_FAN
 digitalHigh(PIN_HEATER);
 }
 
@@ -106,9 +91,7 @@ digitalHigh(PIN_HEATER);
 
 #define CHANNELS       2
 #define CHANNEL_HEATER 0
-#ifdef WITH_FAN
 #define CHANNEL_FAN    1
-#endif
 
 typedef struct Channel_s {
   volatile uint8_t target; // percentage of on-time
@@ -124,7 +107,7 @@ Channel_t Channels[CHANNELS] = {
 #ifdef WITH_FAN
   // fan
   { 0, 0, 0, false, PIN_FAN } 
-#endif
+#endif // WITH_FAN
 };
 
 // delay to align relay activation with the actual zero crossing
@@ -139,7 +122,7 @@ struct {
 } zxLoopCalibration = {
   0, {}
 };
-#endif
+#endif // WITH_CALIBRATION
 
 // ----------------------------------------------------------------------------
 //                             ZERO CROSSING ISR
@@ -195,7 +178,7 @@ void timerIsr(void) { // ticks with 100µS
   else {
     digitalHigh(Channels[CHANNEL_FAN].pin);
   }
-#endif
+#endif //WITH_FAN
 
   // wave packet control for heater
   if (Channels[CHANNEL_HEATER].next > lastTicks // FIXME: this looses ticks when overflowing
@@ -217,7 +200,7 @@ void timerIsr(void) { // ticks with 100µS
   if (zxLoopCalibration.iterations < zxCalibrationLoops) {
     zxLoopCalibration.measure[zxLoopCalibration.iterations]++;
   }
-#endif
+#endif // WITH_CALIBRATION
 }
 // ----------------------------------------------------------------------------
 void abortWithError(int error) {
@@ -236,7 +219,7 @@ void setup() {
   Serial.print("Mains frequency = ");
   Serial.print( MAINS_FREQ );
   Serial.println("hz");
-#endif
+#endif // SERIAL_VERBOSE
   
   setupPins(); 
   setupTFT();
@@ -268,7 +251,7 @@ void setup() {
 
 #ifdef WITH_FAN
   loadFanSpeed();
-#endif
+#endif // WITH_FAN
   loadPID();
 
   myPID.SetOutputLimits(0, 100); // max output 100%
@@ -283,7 +266,7 @@ void setup() {
 
 #ifdef WITH_SPLASH
   displaySplash();
-#endif
+#endif // WITH_SPLASH
 
 #ifdef WITH_CALIBRATION
   tft.setCursor(7, 99);  
@@ -303,7 +286,7 @@ void setup() {
   tft.print(zxLoopDelay);
 #else
   zxLoopDelay = DEFAULT_LOOP_DELAY;
-#endif
+#endif // WITH_CALIBRATION
 
 //  setupMenu();
   menuExit(Menu::actionDisplay); // reset to initial state
@@ -336,31 +319,6 @@ void updateSoakSetpoint(bool down = false) {
     lastSoakTicks = zeroCrossTicks;
   }
 }
-
-// ----------------------------------------------------------------------------
-
-#ifdef PIDTUNE
-void toggleAutoTune() {
- if(currentState != Tune) { //Set the output to the desired starting frequency.
-    currentState = Tune;
-
-    Output = aTuneStartValue;
-    PIDTune.SetNoiseBand(aTuneNoise);
-    PIDTune.SetOutputStep(aTuneStep);
-    PIDTune.SetLookbackSec((int)aTuneLookBack);
-  }
-  else { // cancel autotune
-    PIDTune.Cancel();
-    currentState = CoolDown;
-  }
-}
-#endif // PIDTUNE
-
-// ----------------------------------------------------------------------------
-
-
-
-// ----------------------------------------------------------------------------
 
 void loop(void) 
 {
@@ -491,7 +449,7 @@ void loop(void)
 #ifdef SERIAL_VERBOSE
         Serial.print("PID Input: ");
         Serial.println((uint8_t)Input);
-#endif
+#endif // SERIAL_VERBOSE
     }
     // display update
     if (zeroCrossTicks - lastDisplayUpdate >= TICKS_TO_REDRAW) {
@@ -503,7 +461,6 @@ void loop(void)
     }
 
     switch (currentState) {
-#ifndef PIDTUNE
       case RampToSoak:
         if (stateChanged) {
           lastRampTicks = zeroCrossTicks;
@@ -571,14 +528,14 @@ void loop(void)
           myPID.SetControllerDirection(REVERSE);
 #ifdef WITH_FAN
           myPID.SetTunings(fanPID.Kp, fanPID.Ki, fanPID.Kd);
-#endif
+#endif // WITH_FAN
           Setpoint = activeProfile.peakTemp - 15; // get it all going with a bit of a kick! v sluggish here otherwise, too hot too long
 #ifdef WITH_BEEPER
           tone(PIN_BEEPER, BEEP_FREQ, 3000);  // Beep as a reminder that CoolDown starts (and maybe open up the oven door for fast enough cooldown)
-#endif
+#endif // WITH_BEEPER
 #ifdef WITH_SERVO       
           // TODO: implement servo operated lid
-#endif   
+#endif // WITH_SERVO
         }
 
         updateRampSetpoint(true);
@@ -587,14 +544,14 @@ void loop(void)
           currentState = CoolDown;
         }
         break;
-#endif
+
       case CoolDown:
         if (stateChanged) {
           stateChanged = false;
           myPID.SetControllerDirection(REVERSE);
 #ifdef WITH_FAN
           myPID.SetTunings(fanPID.Kp, fanPID.Ki, fanPID.Kd);
-#endif
+#endif // WITH_FAN
           Setpoint = idleTemp;
         }
 
@@ -612,35 +569,6 @@ void loop(void)
         }
         break;
 
-#ifdef PIDTUNE
-      case Tune:
-        {
-          Setpoint = 220.0;
-          int8_t val = PIDTune.Runtime();
-         // PIDTune.setpoint = 220.0; // is private inside PIDTune
-
-          if (val != 0) {
-            currentState = CoolDown;
-          }
-
-          if (currentState != Tune) { // we're done, set the tuning parameters
-            heaterPID.Kp = PIDTune.GetKp();
-            heaterPID.Ki = PIDTune.GetKi();
-            heaterPID.Kd = PIDTune.GetKd();
-            
-            savePID();
-
-            tft.setCursor(40, 40);
-            tft.print("Kp: "); tft.print((uint32_t)(heaterPID.Kp * 100));
-            tft.setCursor(40, 52);
-            tft.print("Ki: "); tft.print((uint32_t)(heaterPID.Ki * 100));
-            tft.setCursor(40, 64);
-            tft.print("Kd: "); tft.print((uint32_t)(heaterPID.Kd * 100));
-          }
-          break;
-        }
-#endif
-
       default:
         break;
     }
@@ -653,7 +581,6 @@ void loop(void)
   //if (Setpoint > Input + 50) abortWithError(10); // if we're 50 degree cooler than setpoint, abort
   //if (Input > Setpoint + 50) abortWithError(20); // or 50 degrees hotter, also abort
   
-#ifndef PIDTUNE
   myPID.Compute();
 
   // decides which control signal is fed to the output for this cycle
@@ -668,32 +595,25 @@ void loop(void)
     heaterValue = Output;
 #ifdef WITH_FAN
     fanValue = fanAssistSpeed;
-#endif
+#endif // WITH_FAN
   } 
   else {
     heaterValue = 0;
 #ifdef WITH_FAN
     fanValue = Output;
-#endif
+#endif // WITH_FAN
   }
-#else
-  heaterValue = Output;
-#ifdef WITH_FAN
-  fanValue = fanAssistSpeed;
-#endif
-#endif
 
   Channels[CHANNEL_HEATER].target = heaterValue;
 
 #ifdef WITH_FAN
   double fanTmp = 90.0 / 100.0 * fanValue; // 0-100% -> 0-90° phase control
   Channels[CHANNEL_FAN].target = 90 - (uint8_t)fanTmp;
-#endif
+#endif // WITH_FAN
 }
 
 
 void saveProfile(unsigned int targetProfile, bool quiet) {
-#ifndef PIDTUNE
   activeProfileId = targetProfile;
 
   if (!quiet) {
@@ -702,13 +622,11 @@ void saveProfile(unsigned int targetProfile, bool quiet) {
   saveParameters(activeProfileId); // activeProfileId is modified by the menu code directly, this method is called by a menu action
 
   if (!quiet) delay(500);
-#endif
 }
 
 #define WITH_CHECKSUM 1
 
 bool firstRun() { 
-#ifndef PIDTUNE
 #ifndef ALWAYS_FIRST_RUN
 
   // if all bytes of a profile in the middle of the eeprom space are 255, we assume it's a first run
@@ -719,7 +637,6 @@ bool firstRun() {
       return false;
     }
   }
-#endif
 #endif
   return true;
 }

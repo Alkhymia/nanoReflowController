@@ -377,7 +377,6 @@ bool menu_editNumericalValue(const Menu::Action_t action) {
 // ----------------------------------------------------------------------------
 
 void factoryReset() {
-#ifndef PIDTUNE
   makeDefaultProfile();
   
   tft.fillScreen(ST7735_BLUE);
@@ -394,7 +393,7 @@ void factoryReset() {
 #ifdef WITH_FAN
   fanAssistSpeed = FACTORY_FAN_ASSIST_SPEED;
   saveFanSpeed();
-#endif
+#endif // WITH_FAN
 
   heaterPID.Kp = FACTORY_KP; // 0.60; 
   heaterPID.Ki = FACTORY_KI; //0.01;
@@ -405,13 +404,11 @@ void factoryReset() {
   saveLastUsedProfile();
 
   delay(500);
-#endif
 }
 
 // ----------------------------------------------------------------------------
 
 bool menu_factoryReset(const Menu::Action_t action) {
-#ifndef PIDTUNE
   if (action == Menu::actionDisplay) {
     bool initial = currentState != Edit;
     currentState = Edit;
@@ -440,7 +437,6 @@ bool menu_factoryReset(const Menu::Action_t action) {
       return false;
     }
   }
-#endif // PIDTUNE
 
 return(EXIT_SUCCESS);
 }
@@ -486,7 +482,6 @@ void loadProfile(unsigned int targetProfile) {
 // ----------------------------------------------------------------------------
 
 bool menu_saveLoadProfile(const Menu::Action_t action) {
-#ifndef PIDTUNE
   bool isLoad = MenuEngine.currentItem == &miLoadProfile;
 
   if (action == Menu::actionDisplay) {
@@ -526,7 +521,6 @@ bool menu_saveLoadProfile(const Menu::Action_t action) {
       return false;
     }
   }
-#endif // PIDTUNE
 
 return(EXIT_SUCCESS);
 }
@@ -540,11 +534,7 @@ bool menu_cycleStart(const Menu::Action_t action) {
     startCycleZeroCrossTicks = zeroCrossTicks;
     menuExit(action);
 
-#ifndef PIDTUNE    
     currentState = RampToSoak;
-#else
-    toggleAutoTune();
-#endif
     initialProcessDisplay = false;
     menuUpdateRequest = false;
   }
@@ -595,11 +585,7 @@ void renderMenuItem(const Menu::Item_t *mi, uint8_t pos) {
 //       Name,             Label,           Next,           Previous,       Parent,         Child,          Callback
 
 MenuItem(miExit,           "",              Menu::NullItem, Menu::NullItem, Menu::NullItem, miCycleStart,   menuExit);
-#ifndef PIDTUNE
 MenuItem(miCycleStart,    "Start Cycle",    miEditProfile,  Menu::NullItem, miExit,         Menu::NullItem, menu_cycleStart);
-#else
-MenuItem(miCycleStart,    "Start Autotune", miEditProfile,  Menu::NullItem, miExit,         Menu::NullItem, menu_cycleStart);
-#endif
 MenuItem(miEditProfile,   "Edit Profile",   miLoadProfile,  miCycleStart,   miExit,         miRampUpRate,   menuDummy);
   MenuItem(miRampUpRate,  "Ramp up  ",      miSoakTempA,    Menu::NullItem, miEditProfile,  Menu::NullItem, menu_editNumericalValue);
   MenuItem(miSoakTempA,   "Soak temp A",    miSoakTempB,    miRampUpRate,   miEditProfile,  Menu::NullItem, menu_editNumericalValue);
@@ -616,7 +602,7 @@ MenuItem(miPidSettings,   "PID Settings",   miFactoryReset, miFanSettings,  miEx
 #else
 MenuItem(miSaveProfile,   "Save Profile",   miPidSettings,  miLoadProfile,  miExit,         Menu::NullItem, menu_saveLoadProfile);
 MenuItem(miPidSettings,   "PID Settings",   miFactoryReset, miSaveProfile,  miExit,         miPidSettingP,  menuDummy);
-#endif
+#endif // WITH FAN
   MenuItem(miPidSettingP, "Heater Kp",      miPidSettingI,  Menu::NullItem, miPidSettings,  Menu::NullItem, menu_editNumericalValue);
   MenuItem(miPidSettingI, "Heater Ki",      miPidSettingD,  miPidSettingP,  miPidSettings,  Menu::NullItem, menu_editNumericalValue);
   MenuItem(miPidSettingD, "Heater Kd",      Menu::NullItem, miPidSettingI,  miPidSettings,  Menu::NullItem, menu_editNumericalValue);
@@ -634,12 +620,8 @@ void drawInitialProcessDisplay()
     tft.fillScreen(ST7735_WHITE);
     tft.fillRect(0, 0, tft.width(), menuItemHeight, ST7735_BLUE);
     tft.setCursor(1, 2);
-#ifndef PIDTUNE
     tft.print("Profile ");
     tft.print(activeProfileId);
-#else
-    tft.print("Tuning ");
-#endif
 
     tmp = h / (activeProfile.peakTemp * TEMPERATURE_WINDOW) * 100.0;
     pxPerC = tmp;
@@ -663,7 +645,7 @@ void drawInitialProcessDisplay()
     Serial.println(pxPerC);
     Serial.print("/");
     Serial.println(pxPerSec);
-#endif   
+#endif // SERIAL_VERBOSE
     // 50°C grid
     uint16_t t = (uint16_t)(activeProfile.peakTemp * TEMPERATURE_WINDOW);
     tft.setTextColor(tft.Color565(0xa0, 0xa0, 0xa0));
@@ -708,7 +690,6 @@ void updateProcessDisplay() {
   
   tft.setTextSize(1);
 
-#ifndef PIDTUNE
   // current state
   y -= 2;
   tft.setCursor(tft.width() - 65, y);
@@ -728,7 +709,6 @@ void updateProcessDisplay() {
   tft.print("        "); // lazy: fill up space
 
   tft.setTextColor(ST7735_BLACK, ST7735_WHITE);
-#endif
 
   // set point
   y += 10;
@@ -774,7 +754,7 @@ void updateProcessDisplay() {
   alignRightPrefix((int)fanValue); 
   tft.print((int)fanValue);
   tft.print('%');
-#endif
+#endif // WITH_FAN
 
   tft.print(" \x12 "); // alternative: \x7f
   printDouble(rampRate);

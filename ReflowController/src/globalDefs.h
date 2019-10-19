@@ -6,11 +6,11 @@
 #if MAINS_FREQ == 50
   static const uint8_t DEFAULT_LOOP_DELAY = 89;  // should be about 16% less for 60Hz mains
   static const uint8_t TICKS_PER_SEC      = 100; // for 50Hz mains:  2*50Hz = 100 ticks per second
-#endif
+#endif // MAINS_FREQ == 50
 #if MAINS_FREQ == 60
   static const uint8_t DEFAULT_LOOP_DELAY = 74;  // 60Hz mains = 74?
   static const uint8_t TICKS_PER_SEC      = 120; // for 60Hz mains:  2*60Hz = 120 ticks per second
-#endif
+#endif // MAINS_FREQ == 60
 
 static const uint8_t TICKS_PER_UPDATE     = 50; // 25 makes my MAX6675 keeps outputting the same value even when temperature changes
 static const uint8_t TICKS_TO_REDRAW      = 50; // 
@@ -26,7 +26,7 @@ double Output;
 
 #ifdef WITH_FAN
   uint8_t fanValue;
-#endif
+#endif // WITH_FAN
 uint8_t heaterValue;
 double rampRate = 0;
 
@@ -40,7 +40,7 @@ typedef struct {
 PID_t heaterPID = { FACTORY_KP, FACTORY_KI, FACTORY_KD };
 #ifdef WITH_FAN
   PID_t fanPID    = { 1.00, 0.00, 0.00 };
-#endif
+#endif // WITH_FAN
 
 int idleTemp = 50; // the temperature at which to consider the oven safe to leave to cool naturally
 uint32_t startCycleZeroCrossTicks;
@@ -49,7 +49,7 @@ char buf[20]; // generic char buffer
 
 #ifdef WITH_FAN
   int fanAssistSpeed = 33; // default fan speed
-#endif
+#endif // WITH_FAN
 
 // ----------------------------------------------------------------------------
 // state machine
