@@ -17,17 +17,17 @@ static const uint8_t TICKS_TO_REDRAW      = 50; //
 
 const char * ver = "3.2";
 
-double temperature;
+double actualTemperature;
 uint8_t tcStat = 0;
 
-double Setpoint;
-double Input;
-double Output;
+double heaterSetpoint;
+double heaterInput;
+double heaterOutput;
 
 #ifdef WITH_FAN
   uint8_t fanValue;
 #endif // WITH_FAN
-uint8_t heaterValue;
+uint8_t heaterPower;
 double rampRate = 0;
 
 // ----------------------------------

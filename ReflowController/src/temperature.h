@@ -20,13 +20,13 @@ void readThermocouple() {
     tcStat = 1;
   }
   else {
-    temperature = reading;
+    actualTemperature = reading;
     tcStat = 0;
   }
   
 #ifdef SERIAL_VERBOSE
   Serial.print("Temperature: ");
-  Serial.print(temperature);
+  Serial.print(actualTemperature);
   Serial.println(" °C");
 #endif
   digitalHigh(PIN_TC_CS);

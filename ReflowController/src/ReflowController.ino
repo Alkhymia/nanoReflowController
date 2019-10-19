@@ -35,7 +35,7 @@ bool     stateChanged      = false;
 uint32_t stateChangedTicks = 0;
 // ----------------------------------------------------------------------------
 // PID
-PID myPID(&Input, &Output, &Setpoint, heaterPID.Kp, heaterPID.Ki, heaterPID.Kd, DIRECT);
+PID myPID(&heaterInput, &heaterOutput, &heaterSetpoint, heaterPID.Kp, heaterPID.Ki, heaterPID.Kd, DIRECT);
 
 /*************************************/
 /*************************************/
@@ -244,9 +244,9 @@ void setup() {
   }
 
   // initialize moving average filter
-  runningTotalRampRate = temperature * NUM_TEMP_READINGS;
+  runningTotalRampRate = actualTemperature * NUM_TEMP_READINGS;
   for(int i = 0; i < NUM_TEMP_READINGS; i++) {
-    airTemp[i].temp = temperature;
+    airTemp[i].temp = actualTemperature;
   }
 
 #ifdef WITH_FAN
@@ -307,7 +307,7 @@ uint32_t lastSoakTicks;
 void updateRampSetpoint(bool down = false) {
   if (zeroCrossTicks > lastRampTicks + TICKS_PER_UPDATE) {
     double rate = (down) ? activeProfile.rampDownRate : activeProfile.rampUpRate;
-    Setpoint += (rate / (float)TICKS_PER_SEC * (zeroCrossTicks - lastRampTicks)) * ((down) ? -1 : 1);
+    heaterSetpoint += (rate / (float)TICKS_PER_SEC * (zeroCrossTicks - lastRampTicks)) * ((down) ? -1 : 1);
     lastRampTicks = zeroCrossTicks;
   }
 }
@@ -315,7 +315,7 @@ void updateRampSetpoint(bool down = false) {
 void updateSoakSetpoint(bool down = false) {
   if (zeroCrossTicks > lastSoakTicks + TICKS_PER_UPDATE) {
     double rate = (activeProfile.soakTempB-activeProfile.soakTempA)/(float)activeProfile.soakDuration;
-    Setpoint += (rate / (float)TICKS_PER_SEC * (zeroCrossTicks - lastSoakTicks)) * ((down) ? -1 : 1);
+    heaterSetpoint += (rate / (float)TICKS_PER_SEC * (zeroCrossTicks - lastSoakTicks)) * ((down) ? -1 : 1);
     lastSoakTicks = zeroCrossTicks;
   }
 }
@@ -420,7 +420,7 @@ void loop(void)
 #endif
         // rolling average of the temp T1 and T2
         totalT1 -= readingsT1[index];       // subtract the last reading
-        readingsT1[index] = temperature;
+        readingsT1[index] = actualTemperature;
         totalT1 += readingsT1[index];       // add the reading to the total
         index = (index + 1) % NUM_TEMP_READINGS;  // next position
         averageT1 = totalT1 / (float)NUM_TEMP_READINGS;  // calculate the average temp
@@ -444,11 +444,11 @@ void loop(void)
         
         rampRate = tempDiff / timeDiff;
      
-        Input = airTemp[NUM_TEMP_READINGS - 1].temp; // update the variable the PID reads
+        heaterInput = airTemp[NUM_TEMP_READINGS - 1].temp; // update the variable the PID reads
            
 #ifdef SERIAL_VERBOSE
         Serial.print("PID Input: ");
-        Serial.println((uint8_t)Input);
+        Serial.println((uint8_t)heaterInput);
 #endif // SERIAL_VERBOSE
     }
     // display update
@@ -465,11 +465,11 @@ void loop(void)
         if (stateChanged) {
           lastRampTicks = zeroCrossTicks;
           stateChanged = false;
-          Output = 50;
+          heaterOutput = 50;
           myPID.SetMode(AUTOMATIC);
           myPID.SetControllerDirection(DIRECT);
           myPID.SetTunings(heaterPID.Kp, heaterPID.Ki, heaterPID.Kd);
-          Setpoint = Input;
+          heaterSetpoint = heaterInput;
           #ifdef WITH_BEEPER
               tone(PIN_BEEPER,BEEP_FREQ,100);
           #endif
@@ -477,7 +477,7 @@ void loop(void)
 
         updateRampSetpoint();
 
-        if (Setpoint >= activeProfile.soakTempA - 1) {
+        if (heaterSetpoint >= activeProfile.soakTempA - 1) {
           currentState = Soak;
         }
         break;
@@ -486,7 +486,7 @@ void loop(void)
         if (stateChanged) {
           lastSoakTicks = zeroCrossTicks;
           stateChanged = false;
-          Setpoint = activeProfile.soakTempA;
+          heaterSetpoint = activeProfile.soakTempA;
         }
 
         updateSoakSetpoint();
@@ -504,8 +504,8 @@ void loop(void)
 
         updateRampSetpoint();
 
-        if (Setpoint >= activeProfile.peakTemp - 1) {
-          Setpoint = activeProfile.peakTemp;
+        if (heaterSetpoint >= activeProfile.peakTemp - 1) {
+          heaterSetpoint = activeProfile.peakTemp;
           currentState = Peak;
         }
         break;
@@ -513,7 +513,7 @@ void loop(void)
       case Peak:
         if (stateChanged) {
           stateChanged = false;
-          Setpoint = activeProfile.peakTemp;
+          heaterSetpoint = activeProfile.peakTemp;
         }
 
         if (zeroCrossTicks - stateChangedTicks >= (uint32_t)activeProfile.peakDuration * TICKS_PER_SEC) {
@@ -529,7 +529,7 @@ void loop(void)
 #ifdef WITH_FAN
           myPID.SetTunings(fanPID.Kp, fanPID.Ki, fanPID.Kd);
 #endif // WITH_FAN
-          Setpoint = activeProfile.peakTemp - 15; // get it all going with a bit of a kick! v sluggish here otherwise, too hot too long
+          heaterSetpoint = activeProfile.peakTemp - 15; // get it all going with a bit of a kick! v sluggish here otherwise, too hot too long
 #ifdef WITH_BEEPER
           tone(PIN_BEEPER, BEEP_FREQ, 3000);  // Beep as a reminder that CoolDown starts (and maybe open up the oven door for fast enough cooldown)
 #endif // WITH_BEEPER
@@ -540,7 +540,7 @@ void loop(void)
 
         updateRampSetpoint(true);
 
-        if (Setpoint <= idleTemp) {
+        if (heaterSetpoint <= idleTemp) {
           currentState = CoolDown;
         }
         break;
@@ -552,13 +552,13 @@ void loop(void)
 #ifdef WITH_FAN
           myPID.SetTunings(fanPID.Kp, fanPID.Ki, fanPID.Kd);
 #endif // WITH_FAN
-          Setpoint = idleTemp;
+          heaterSetpoint = idleTemp;
         }
 
-        if (Input < (idleTemp + 5)) {
+        if (heaterInput < (idleTemp + 5)) {
           currentState = Complete;
           myPID.SetMode(MANUAL);
-          Output = 0;
+          heaterOutput = 0;
           #ifdef WITH_BEEPER
             tone(PIN_BEEPER, BEEP_FREQ, 500);  //End Beep
             delay(1500);
@@ -578,8 +578,8 @@ void loop(void)
   // if the thermocouple is wired backwards, temp goes DOWN when it increases
   // during cooling, the t962a lags a long way behind, hence the hugely lenient cooling allowance.
   // both of these errors are blocking and do not exit!
-  //if (Setpoint > Input + 50) abortWithError(10); // if we're 50 degree cooler than setpoint, abort
-  //if (Input > Setpoint + 50) abortWithError(20); // or 50 degrees hotter, also abort
+  //if (heaterSetpoint > heaterInput + 50) abortWithError(10); // if we're 50 degree cooler than setpoint, abort
+  //if (heaterInput > heaterSetpoint + 50) abortWithError(20); // or 50 degrees hotter, also abort
   
   myPID.Compute();
 
@@ -592,19 +592,19 @@ void loop(void)
       && currentState != Settings
       && currentState != Edit)
   {
-    heaterValue = Output;
+    heaterPower = heaterOutput;
 #ifdef WITH_FAN
     fanValue = fanAssistSpeed;
 #endif // WITH_FAN
   } 
   else {
-    heaterValue = 0;
+    heaterPower = 0;
 #ifdef WITH_FAN
-    fanValue = Output;
+    fanValue = heaterOutput;
 #endif // WITH_FAN
   }
 
-  Channels[CHANNEL_HEATER].target = heaterValue;
+  Channels[CHANNEL_HEATER].target = heaterPower;
 
 #ifdef WITH_FAN
   double fanTmp = 90.0 / 100.0 * fanValue; // 0-100% -> 0-90° phase control

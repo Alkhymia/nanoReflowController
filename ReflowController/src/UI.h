@@ -158,10 +158,10 @@ void displayThermocoupleData(uint8_t xpos, uint8_t ypos) {
 
   // temperature
   tft.setTextSize(2);
-  alignRightPrefix((int)temperature);
+  alignRightPrefix((int)actualTemperature);
   switch (tcStat) {
     case 0:
-      tft.print((uint8_t)temperature);
+      tft.print((uint8_t)actualTemperature);
       tft.print("\367C");
       break;
     case 1:
@@ -629,8 +629,8 @@ void drawInitialProcessDisplay()
     double estimatedTotalTime = 0; // 60 * 12;
     // estimate total run time for current profile
     estimatedTotalTime = activeProfile.soakDuration + activeProfile.peakDuration;
-    estimatedTotalTime += (activeProfile.peakTemp - temperature)/(float)activeProfile.rampUpRate;
-    estimatedTotalTime += (activeProfile.peakTemp - temperature)/(float)activeProfile.rampDownRate;
+    estimatedTotalTime += (activeProfile.peakTemp - actualTemperature)/(float)activeProfile.rampUpRate;
+    estimatedTotalTime += (activeProfile.peakTemp - actualTemperature)/(float)activeProfile.rampDownRate;
     estimatedTotalTime *= 1.1; // add some spare
     
     tmp = w / estimatedTotalTime; 
@@ -714,8 +714,8 @@ void updateProcessDisplay() {
   y += 10;
   tft.setCursor(tft.width() - 65, y);
   tft.print("Sp:"); 
-  alignRightPrefix((int)Setpoint); 
-  printDouble(Setpoint);
+  alignRightPrefix((int)heaterSetpoint); 
+  printDouble(heaterSetpoint);
   tft.print("\367C  ");
 
   // draw temperature curves
@@ -732,11 +732,11 @@ void updateProcessDisplay() {
   } while(dx > w);
 
   // temperature setpoint
-  dy = h - ((uint16_t)Setpoint * pxPerC / 100) + yOffset;
+  dy = h - ((uint16_t)heaterSetpoint * pxPerC / 100) + yOffset;
   tft.drawPixel(dx, dy, ST7735_BLUE);
 
   // actual temperature
-  dy = h - ((uint16_t)temperature * pxPerC / 100) + yOffset;
+  dy = h - ((uint16_t)actualTemperature * pxPerC / 100) + yOffset;
   tft.drawPixel(dx, dy, ST7735_RED);
 
   // bottom line
@@ -745,8 +745,8 @@ void updateProcessDisplay() {
   // set values
   tft.setCursor(1, y);
   tft.print("\xef");
-  alignRightPrefix((int)heaterValue); 
-  tft.print((int)heaterValue);
+  alignRightPrefix((int)heaterPower); 
+  tft.print((int)heaterPower);
   tft.print('%');
 
 #ifdef WITH_FAN
