@@ -527,8 +527,6 @@ return(EXIT_SUCCESS);
 
 // ----------------------------------------------------------------------------
 
-void toggleAutoTune();
-
 bool menu_cycleStart(const Menu::Action_t action) {
   if (action == Menu::actionDisplay) {
     startCycleZeroCrossTicks = zeroCrossTicks;

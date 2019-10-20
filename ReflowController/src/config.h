@@ -3,7 +3,6 @@
 
 //#define ALWAYS_FIRST_RUN
 //#define FAKE_HW 1
-//#define PIDTUNE 1 // autotune wouldn't fit in the 28k available on my arduino pro micro.
 #define WITH_BEEPER // Enables Beeper
 #define WITH_FAN    // Enables Fan
 //#define WITH_SERVO  // Enables Lid opening Servo (not yet implemented)
