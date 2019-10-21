@@ -3,10 +3,11 @@
 
 //#define ALWAYS_FIRST_RUN
 //#define FAKE_HW 1
-#define WITH_BEEPER // Enables Beeper
-#define WITH_FAN    // Enables Fan
+//#define WITH_BEEPER // Enables Beeper
+//#define WITH_FAN    // Enables Fan
 //#define WITH_SERVO  // Enables Lid opening Servo (not yet implemented)
-#define SERIAL_VERBOSE
+//#define SERIAL_VERBOSE
+#define DEBUG 2
 
 // run a calibration loop that measures how many timer ticks occur between 2 zero corssings
 // FIXME: does not work reliably at the moment, so a oscilloscope-determined value is used.

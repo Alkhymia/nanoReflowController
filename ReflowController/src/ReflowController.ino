@@ -23,6 +23,8 @@
 #include "UI.h"
 #include "globalDefs.h"
 
+#include <pidautotuner.h>
+
 // ----------------------------------------------------------------------------
 volatile uint32_t    timerTicks       = 0;
 volatile uint8_t     phaseCounter     = 0;
@@ -36,6 +38,8 @@ uint32_t stateChangedTicks = 0;
 // ----------------------------------------------------------------------------
 // PID
 PID myPID(&heaterInput, &heaterOutput, &heaterSetpoint, heaterPID.Kp, heaterPID.Ki, heaterPID.Kd, DIRECT);
+
+PIDAutotuner tuner = PIDAutotuner();
 
 /*************************************/
 /*************************************/
@@ -114,14 +118,14 @@ Channel_t Channels[CHANNELS] = {
 uint16_t zxLoopDelay = 0;
 
 #ifdef WITH_CALIBRATION
-// calibrate zero crossing: how many timerIsr happen within one zero crossing
-#define zxCalibrationLoops 128
-struct {
-  volatile int8_t iterations;
-  volatile uint8_t measure[zxCalibrationLoops];
-} zxLoopCalibration = {
-  0, {}
-};
+  // calibrate zero crossing: how many timerIsr happen within one zero crossing
+  #define zxCalibrationLoops 128
+  struct {
+    volatile int8_t iterations;
+    volatile uint8_t measure[zxCalibrationLoops];
+  } zxLoopCalibration = {
+    0, {}
+  };
 #endif // WITH_CALIBRATION
 
 // ----------------------------------------------------------------------------
@@ -151,11 +155,11 @@ void zeroCrossingIsr(void) {
 
   ch = ((ch + 1) % CHANNELS); // next channel
 
-#ifdef WITH_CALIBRATION
-  if (zxLoopCalibration.iterations < zxCalibrationLoops) {
-    zxLoopCalibration.iterations++;
-  }
-#endif
+  #ifdef WITH_CALIBRATION
+    if (zxLoopCalibration.iterations < zxCalibrationLoops) {
+      zxLoopCalibration.iterations++;
+    }
+  #endif
 }
 
 // ----------------------------------------------------------------------------
@@ -166,19 +170,19 @@ void zeroCrossingIsr(void) {
 void timerIsr(void) { // ticks with 100µS
   static uint32_t lastTicks = 0;
 
-#ifdef WITH_FAN
-  // phase control for the fan 
-  if (++phaseCounter > 90) {
-    phaseCounter = 0;
-  }
+  #ifdef WITH_FAN
+    // phase control for the fan 
+    if (++phaseCounter > 90) {
+      phaseCounter = 0;
+    }
 
-  if (phaseCounter > Channels[CHANNEL_FAN].target) {
-    digitalLow(Channels[CHANNEL_FAN].pin); 
-  }
-  else {
-    digitalHigh(Channels[CHANNEL_FAN].pin);
-  }
-#endif //WITH_FAN
+    if (phaseCounter > Channels[CHANNEL_FAN].target) {
+      digitalLow(Channels[CHANNEL_FAN].pin); 
+    }
+    else {
+      digitalHigh(Channels[CHANNEL_FAN].pin);
+    }
+  #endif //WITH_FAN
 
   // wave packet control for heater
   if (Channels[CHANNEL_HEATER].next > lastTicks // FIXME: this looses ticks when overflowing
@@ -196,11 +200,11 @@ void timerIsr(void) { // ticks with 100µS
 
   timerTicks++;
 
-#ifdef WITH_CALIBRATION
-  if (zxLoopCalibration.iterations < zxCalibrationLoops) {
-    zxLoopCalibration.measure[zxLoopCalibration.iterations]++;
-  }
-#endif // WITH_CALIBRATION
+  #ifdef WITH_CALIBRATION
+    if (zxLoopCalibration.iterations < zxCalibrationLoops) {
+      zxLoopCalibration.measure[zxLoopCalibration.iterations]++;
+    }
+  #endif // WITH_CALIBRATION
 }
 // ----------------------------------------------------------------------------
 void abortWithError(int error) {
@@ -210,16 +214,16 @@ void abortWithError(int error) {
 // ----------------------------------------------------------------------------
 
 void setup() {
-#ifdef SERIAL_VERBOSE
   Serial.begin(115200);
   Serial.print("nano Reflow controller v"),
   Serial.print(ver);
   Serial.println(" started");
   Serial.println("-----------------------------------");
-  Serial.print("Mains frequency = ");
-  Serial.print( MAINS_FREQ );
-  Serial.println("hz");
-#endif // SERIAL_VERBOSE
+  #if DEBUG >= 1
+    Serial.print("Mains frequency = ");
+    Serial.print( MAINS_FREQ );
+    Serial.println("hz");
+  #endif // DEBUG
   
   setupPins(); 
   setupTFT();
@@ -411,45 +415,40 @@ void loop(void)
       } else thermocoupleErrorCount = 0;
     }
     else {
-        thermocoupleErrorCount = 0;
-#if 0 // verbose thermocouple error bits
+      thermocoupleErrorCount = 0;
+      #if 0 // verbose thermocouple error bits
         tft.setCursor(10, 40);
         for (uint8_t mask = B111; mask; mask >>= 1) {
           tft.print(mask & tSensor.stat ? '1' : '0');
         }
-#endif
-        // rolling average of the temp T1 and T2
-        totalT1 -= readingsT1[index];       // subtract the last reading
-        readingsT1[index] = actualTemperature;
-        totalT1 += readingsT1[index];       // add the reading to the total
-        index = (index + 1) % NUM_TEMP_READINGS;  // next position
-        averageT1 = totalT1 / (float)NUM_TEMP_READINGS;  // calculate the average temp
+      #endif
+      // rolling average of the temp T1 and T2
+      totalT1 -= readingsT1[index];       // subtract the last reading
+      readingsT1[index] = actualTemperature;
+      totalT1 += readingsT1[index];       // add the reading to the total
+      index = (index + 1) % NUM_TEMP_READINGS;  // next position
+      averageT1 = totalT1 / (float)NUM_TEMP_READINGS;  // calculate the average temp
     
-        // need to keep track of a few past readings in order to work out rate of rise
-        for (int i = 1; i < NUM_TEMP_READINGS; i++) { // iterate over all previous entries, moving them backwards one index
-          airTemp[i - 1].temp = airTemp[i].temp;
-          airTemp[i - 1].ticks = airTemp[i].ticks;     
-        }
+      // need to keep track of a few past readings in order to work out rate of rise
+      for (int i = 1; i < NUM_TEMP_READINGS; i++) { // iterate over all previous entries, moving them backwards one index
+        airTemp[i - 1].temp = airTemp[i].temp;
+        airTemp[i - 1].ticks = airTemp[i].ticks;     
+      }
     
-        airTemp[NUM_TEMP_READINGS - 1].temp = averageT1; // update the last index with the newest average
-        airTemp[NUM_TEMP_READINGS - 1].ticks = (uint16_t)deltaT;
+      airTemp[NUM_TEMP_READINGS - 1].temp = averageT1; // update the last index with the newest average
+      airTemp[NUM_TEMP_READINGS - 1].ticks = (uint16_t)deltaT;
     
-        // calculate rate of temperature change
-        uint32_t collectTicks = 0;
-        for (int i = 0; i < NUM_TEMP_READINGS; i++) {
-          collectTicks += airTemp[i].ticks;
-        }
-        float tempDiff = (airTemp[NUM_TEMP_READINGS - 1].temp - airTemp[0].temp);
-        float timeDiff = collectTicks / (float)(TICKS_PER_SEC);
+      // calculate rate of temperature change
+      uint32_t collectTicks = 0;
+      for (int i = 0; i < NUM_TEMP_READINGS; i++) {
+        collectTicks += airTemp[i].ticks;
+      }
+      float tempDiff = (airTemp[NUM_TEMP_READINGS - 1].temp - airTemp[0].temp);
+      float timeDiff = collectTicks / (float)(TICKS_PER_SEC);
         
-        rampRate = tempDiff / timeDiff;
+      rampRate = tempDiff / timeDiff;
      
-        heaterInput = airTemp[NUM_TEMP_READINGS - 1].temp; // update the variable the PID reads
-           
-#ifdef SERIAL_VERBOSE
-        Serial.print("PID Input: ");
-        Serial.println((uint8_t)heaterInput);
-#endif // SERIAL_VERBOSE
+      heaterInput = airTemp[NUM_TEMP_READINGS - 1].temp; // update the variable the PID reads
     }
     // display update
     if (zeroCrossTicks - lastDisplayUpdate >= TICKS_TO_REDRAW) {
@@ -526,16 +525,16 @@ void loop(void)
           stateChanged = false;
           lastRampTicks = zeroCrossTicks;
           myPID.SetControllerDirection(REVERSE);
-#ifdef WITH_FAN
-          myPID.SetTunings(fanPID.Kp, fanPID.Ki, fanPID.Kd);
-#endif // WITH_FAN
+          #ifdef WITH_FAN
+            myPID.SetTunings(fanPID.Kp, fanPID.Ki, fanPID.Kd);
+          #endif // WITH_FAN
           heaterSetpoint = activeProfile.peakTemp - 15; // get it all going with a bit of a kick! v sluggish here otherwise, too hot too long
-#ifdef WITH_BEEPER
-          tone(PIN_BEEPER, BEEP_FREQ, 3000);  // Beep as a reminder that CoolDown starts (and maybe open up the oven door for fast enough cooldown)
-#endif // WITH_BEEPER
-#ifdef WITH_SERVO       
+          #ifdef WITH_BEEPER
+            tone(PIN_BEEPER, BEEP_FREQ, 3000);  // Beep as a reminder that CoolDown starts (and maybe open up the oven door for fast enough cooldown)
+          #endif // WITH_BEEPER
+          #ifdef WITH_SERVO       
           // TODO: implement servo operated lid
-#endif // WITH_SERVO
+          #endif // WITH_SERVO
         }
 
         updateRampSetpoint(true);
@@ -549,9 +548,9 @@ void loop(void)
         if (stateChanged) {
           stateChanged = false;
           myPID.SetControllerDirection(REVERSE);
-#ifdef WITH_FAN
-          myPID.SetTunings(fanPID.Kp, fanPID.Ki, fanPID.Kd);
-#endif // WITH_FAN
+          #ifdef WITH_FAN
+            myPID.SetTunings(fanPID.Kp, fanPID.Ki, fanPID.Kd);
+          #endif // WITH_FAN
           heaterSetpoint = idleTemp;
         }
 
@@ -569,9 +568,91 @@ void loop(void)
         }
         break;
 
+      case PreTune:
+        if (stateChanged) {
+          #if DEBUG >= 1
+            Serial.println("Started Pretune");
+          #endif
+          stateChanged = false;
+        	myPID.SetMode(MANUAL);
+        	heaterSetpoint = tuningSetTemp;
+          heaterOutput = 100;
+        }
+
+        if (actualTemperature >=  tuningSetTemp - 20) {
+          currentState = Tune;
+        }
+
+        break;
+
+      case Tune:
+        {
+          if (stateChanged) {
+            #if DEBUG >= 1
+              Serial.println("Started Tune");
+            #endif
+            stateChanged = false;
+            heaterSetpoint = tuningSetTemp;
+            
+            tuner.setTargetInputValue(tuningSetTemp);
+            //tuner.setLoopInterval(TICKS_TO_REDRAW / TICKS_PER_SEC * 1000000); // time between PID in µS
+            tuner.setLoopInterval(100000);
+            tuner.setOutputRange(0, 100);
+            tuner.setZNMode(PIDAutotuner::ZNModeBasicPID);
+            tuner.startTuningLoop();
+          }
+
+          // Get input value here (temperature, encoder position, velocity, etc)
+          //double input = actualTemperature;
+
+          // Call tunePID() with the input value
+          //double pidoutput = tuner.tunePID(input);
+
+          // Set the output - tunePid() will return values within the range configured
+          // by setOutputRange(). Don't change the value or the tuning results will be
+          // incorrect.
+          //heaterOutput = pidoutput;
+
+
+       
+          if (tuner.isFinished()) {
+            // Turn the output off here.
+            heaterOutput = 0;
+            currentState = CoolDown;
+
+            // Get PID gains - set your PID controller's gains to these
+            heaterPID.Kp = tuner.getKp();
+            heaterPID.Ki = tuner.getKi();
+            heaterPID.Kd = tuner.getKd();
+
+            savePID();
+
+            tft.setCursor(40, 40);
+            tft.print("Kp: "); 
+            printDouble(heaterPID.Kp);
+            tft.setCursor(40, 50);
+            tft.print("Ki: "); 
+            printDouble(heaterPID.Ki);
+            tft.setCursor(40, 60);
+            tft.print("Kd: "); 
+            printDouble(heaterPID.Kd);
+
+            #if DEBUG >= 1
+              Serial.println("Tuning Finished");
+              Serial.print("Heater Kp: ");
+              Serial.println(heaterPID.Kp);
+              Serial.print("Heater Ki: ");
+              Serial.println(heaterPID.Ki);
+              Serial.print("Heater Kd: ");
+              Serial.println(heaterPID.Kd);
+            #endif // DEBUG
+          }
+        }
+
       default:
         break;
     }
+
   }
 
   // safety check that we're not doing something stupid. 
@@ -580,36 +661,34 @@ void loop(void)
   // both of these errors are blocking and do not exit!
   //if (heaterSetpoint > heaterInput + 50) abortWithError(10); // if we're 50 degree cooler than setpoint, abort
   //if (heaterInput > heaterSetpoint + 50) abortWithError(20); // or 50 degrees hotter, also abort
-  
-  myPID.Compute();
+  long milliseconds;
 
-  // decides which control signal is fed to the output for this cycle
-  if (   currentState != RampDown
-      && currentState != CoolDown
-      && currentState != Settings
-      && currentState != Complete
-      && currentState != Idle
-      && currentState != Settings
-      && currentState != Edit)
-  {
+  if (currentState == RampToSoak || currentState == Soak || currentState == RampUp || currentState == Peak || currentState == PreTune) {
+    myPID.Compute();
     heaterPower = heaterOutput;
-#ifdef WITH_FAN
-    fanValue = fanAssistSpeed;
-#endif // WITH_FAN
-  } 
-  else {
+  } else if (currentState == Tune) {
+    milliseconds = millis();
+    heaterPower = tuner.tunePID(actualTemperature);
+    #if DEBUG >= 2
+      Serial.print("ms: ");
+      Serial.print(millis());
+      Serial.print(" - Temp: ");
+      Serial.print(actualTemperature);
+      Serial.print(" - Output: ");
+      Serial.println(heaterPower);
+    #endif // DEBUG
+    while (millis() - milliseconds < 100) delay(1);
+  } else {
     heaterPower = 0;
-#ifdef WITH_FAN
-    fanValue = heaterOutput;
-#endif // WITH_FAN
   }
+
 
   Channels[CHANNEL_HEATER].target = heaterPower;
 
-#ifdef WITH_FAN
-  double fanTmp = 90.0 / 100.0 * fanValue; // 0-100% -> 0-90° phase control
-  Channels[CHANNEL_FAN].target = 90 - (uint8_t)fanTmp;
-#endif // WITH_FAN
+  #ifdef WITH_FAN
+    double fanTmp = 90.0 / 100.0 * fanValue; // 0-100% -> 0-90° phase control
+    Channels[CHANNEL_FAN].target = 90 - (uint8_t)fanTmp;
+  #endif // WITH_FAN
 }
 
 
@@ -627,16 +706,15 @@ void saveProfile(unsigned int targetProfile, bool quiet) {
 #define WITH_CHECKSUM 1
 
 bool firstRun() { 
-#ifndef ALWAYS_FIRST_RUN
+  #ifndef ALWAYS_FIRST_RUN
+    // if all bytes of a profile in the middle of the eeprom space are 255, we assume it's a first run
+    unsigned int offset = 15 * sizeof(Profile_t);
 
-  // if all bytes of a profile in the middle of the eeprom space are 255, we assume it's a first run
-  unsigned int offset = 15 * sizeof(Profile_t);
-
-  for (uint16_t i = offset; i < offset + sizeof(Profile_t); i++) {
-    if (EEPROM.read(i) != 255) {
-      return false;
+    for (uint16_t i = offset; i < offset + sizeof(Profile_t); i++) {
+      if (EEPROM.read(i) != 255) {
+        return false;
+      }
     }
-  }
-#endif
+  #endif
   return true;
 }

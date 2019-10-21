@@ -184,7 +184,8 @@ void clearLastMenuItemRenderState() {
 // ----------------------------------------------------------------------------
 
 extern const 
-  Menu::Item_t miRampUpRate,
+  Menu::Item_t miCycleStart,
+    miRampUpRate,
     miSoakTempA,
     miSoakTempB,
     miSoakTime,
@@ -531,8 +532,16 @@ bool menu_cycleStart(const Menu::Action_t action) {
   if (action == Menu::actionDisplay) {
     startCycleZeroCrossTicks = zeroCrossTicks;
     menuExit(action);
+    
+    if(MenuEngine.currentItem == &miCycleStart)
+    {
+      currentState = RampToSoak;      
+    }
+    else
+    {
+      currentState = PreTune;      
+    }
 
-    currentState = RampToSoak;
     initialProcessDisplay = false;
     menuUpdateRequest = false;
   }
@@ -596,15 +605,17 @@ MenuItem(miLoadProfile,   "Load Profile",   miSaveProfile,  miEditProfile,  miEx
 #ifdef WITH_FAN
 MenuItem(miSaveProfile,   "Save Profile",   miFanSettings,  miLoadProfile,  miExit,         Menu::NullItem, menu_saveLoadProfile);
 MenuItem(miFanSettings,   "Fan Speed",      miPidSettings,  miSaveProfile,  miExit,         Menu::NullItem, menu_editNumericalValue);
-MenuItem(miPidSettings,   "PID Settings",   miFactoryReset, miFanSettings,  miExit,         miPidSettingP,  menuDummy);
+MenuItem(miPidSettings,   "PID Settings",   miFactoryReset, miFanSettings,  miExit,         miPidTune,  menuDummy);
 #else
 MenuItem(miSaveProfile,   "Save Profile",   miPidSettings,  miLoadProfile,  miExit,         Menu::NullItem, menu_saveLoadProfile);
-MenuItem(miPidSettings,   "PID Settings",   miFactoryReset, miSaveProfile,  miExit,         miPidSettingP,  menuDummy);
+MenuItem(miPidSettings,   "PID Settings",   miFactoryReset, miSaveProfile,  miExit,         miPidTune,  menuDummy);
 #endif // WITH FAN
-  MenuItem(miPidSettingP, "Heater Kp",      miPidSettingI,  Menu::NullItem, miPidSettings,  Menu::NullItem, menu_editNumericalValue);
+  MenuItem(miPidTune,     "PID Autotune",   miPidSettingP,  Menu::NullItem, miPidSettings,  Menu::NullItem, menu_cycleStart);
+  MenuItem(miPidSettingP, "Heater Kp",      miPidSettingI,  miPidTune,      miPidSettings,  Menu::NullItem, menu_editNumericalValue);
   MenuItem(miPidSettingI, "Heater Ki",      miPidSettingD,  miPidSettingP,  miPidSettings,  Menu::NullItem, menu_editNumericalValue);
   MenuItem(miPidSettingD, "Heater Kd",      Menu::NullItem, miPidSettingI,  miPidSettings,  Menu::NullItem, menu_editNumericalValue);
 MenuItem(miFactoryReset,  "Factory Reset",  Menu::NullItem, miPidSettings,  miExit,         Menu::NullItem, menu_factoryReset);
+
 
 // ----------------------------------------------------------------------------
 void drawInitialProcessDisplay()
@@ -613,26 +624,47 @@ void drawInitialProcessDisplay()
   const uint8_t w = tft.width() - 24;
   const uint8_t yOffset = 30; // space not available for graph  
   double tmp;
+  double estimatedTotalTime;
   initialProcessDisplay = true;
 
     tft.fillScreen(ST7735_WHITE);
     tft.fillRect(0, 0, tft.width(), menuItemHeight, ST7735_BLUE);
     tft.setCursor(1, 2);
-    tft.print("Profile ");
-    tft.print(activeProfileId);
 
-    tmp = h / (activeProfile.peakTemp * TEMPERATURE_WINDOW) * 100.0;
-    pxPerC = tmp;
-    
-    double estimatedTotalTime = 0; // 60 * 12;
-    // estimate total run time for current profile
-    estimatedTotalTime = activeProfile.soakDuration + activeProfile.peakDuration;
-    estimatedTotalTime += (activeProfile.peakTemp - actualTemperature)/(float)activeProfile.rampUpRate;
-    estimatedTotalTime += (activeProfile.peakTemp - actualTemperature)/(float)activeProfile.rampDownRate;
-    estimatedTotalTime *= 1.1; // add some spare
-    
-    tmp = w / estimatedTotalTime; 
-    pxPerSec = (float)tmp;
+    uint16_t maxTemp;
+
+    if(currentState == PreTune) {
+      tft.print("Tuning ");
+      
+      estimatedTotalTime = 300;
+      maxTemp = 300;
+
+    } else {
+      tft.print("Profile ");
+      tft.print(activeProfileId);
+
+      maxTemp = activeProfile.peakTemp;
+
+      //tmp = h / (activeProfile.peakTemp * TEMPERATURE_WINDOW) * 100.0;
+      //pxPerC = tmp;
+      
+      estimatedTotalTime = 0; // 60 * 12;
+      // estimate total run time for current profile
+      estimatedTotalTime = activeProfile.soakDuration + activeProfile.peakDuration;
+      estimatedTotalTime += (activeProfile.peakTemp - actualTemperature)/(float)activeProfile.rampUpRate;
+      estimatedTotalTime += (activeProfile.peakTemp - actualTemperature)/(float)activeProfile.rampDownRate;
+      estimatedTotalTime *= 1.1; // add some spare
+
+      //tmp = w / estimatedTotalTime; 
+      //pxPerSec = (float)tmp;
+
+      //maxTemp = activeProfile.peakTemp * TEMPERATURE_WINDOW;
+    }
+
+      tmp = h / (maxTemp * TEMPERATURE_WINDOW) * 100.0;
+      pxPerC = tmp;
+      tmp = w / estimatedTotalTime; 
+      pxPerSec = (float)tmp;
    
 #ifdef SERIAL_VERBOSE
   Serial.print("estimatedTotalTime: ");

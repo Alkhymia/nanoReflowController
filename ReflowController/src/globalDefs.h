@@ -23,6 +23,7 @@ uint8_t tcStat = 0;
 double heaterSetpoint;
 double heaterInput;
 double heaterOutput;
+uint16_t tuningSetTemp = 150;
 
 #ifdef WITH_FAN
   uint8_t fanValue;
@@ -71,7 +72,8 @@ typedef enum {
 
   Complete = 20,
 
-  Tune = 30
+  PreTune = 30,
+  Tune
 } State;
 
 State currentState  = Idle;
