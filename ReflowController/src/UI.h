@@ -194,12 +194,12 @@ extern const
     miRampDnRate,
     miLoadProfile,
     miSaveProfile,
-#ifdef WITH_FAN
-    miFanSettings,
-#endif
-    miPidSettingP,
-    miPidSettingI,
-    miPidSettingD;
+    miPidSoakP,
+    miPidSoakI,
+    miPidSoakD,
+    miPidPeakP,
+    miPidPeakI,
+    miPidPeakD;
 
 // ----------------------------------------------------------------------------
 
@@ -233,18 +233,18 @@ void getItemValuePointer(const Menu::Item_t *mi, double **d, int16_t **i) {
   if (mi == &miSoakTempB)   *i = &activeProfile.soakTempB;
   if (mi == &miPeakTime)    *i = &activeProfile.peakDuration;
   if (mi == &miPeakTemp)    *i = &activeProfile.peakTemp;
-  if (mi == &miPidSettingP) *d = &heaterPID.Kp;
-  if (mi == &miPidSettingI) *d = &heaterPID.Ki;
-  if (mi == &miPidSettingD) *d = &heaterPID.Kd;
-#ifdef WITH_FAN
-  if (mi == &miFanSettings) *i = &fanAssistSpeed;
-#endif
+  if (mi == &miPidSoakP)    *d = &heaterPID.soakKp;
+  if (mi == &miPidSoakI)    *d = &heaterPID.soakKi;
+  if (mi == &miPidSoakD)    *d = &heaterPID.soakKd;
+  if (mi == &miPidPeakP)    *d = &heaterPID.peakKp;
+  if (mi == &miPidPeakI)    *d = &heaterPID.peakKi;
+  if (mi == &miPidPeakD)    *d = &heaterPID.peakKd;
 }
 
 // ----------------------------------------------------------------------------
 
 bool isPidSetting(const Menu::Item_t *mi) {
-  return mi == &miPidSettingP || mi == &miPidSettingI || mi == &miPidSettingD;
+  return mi == &miPidSoakP || mi == &miPidSoakI || mi == &miPidSoakD || mi == &miPidPeakP || mi == &miPidPeakI || mi == &miPidPeakD;
 }
 
 bool isRampSetting(const Menu::Item_t *mi) {
@@ -278,11 +278,6 @@ bool getItemValueLabel(const Menu::Item_t *mi, char *label) {
     if (mi == &miPeakTime || mi == &miSoakTime) {
       itostr(label, *iValue, (char*)"s");
     }
-#ifdef WITH_FAN
-    if (mi == &miFanSettings) {
-      itostr(label, *iValue, (char*)"%");
-    }
-#endif
   }
 
   return dValue || iValue;
@@ -357,11 +352,6 @@ bool menu_editNumericalValue(const Menu::Action_t action) {
       if (isPidSetting(MenuEngine.currentItem)) {
         savePID();
       }
-#ifdef WITH_FAN
-      else if (MenuEngine.currentItem == &miFanSettings) {
-        saveFanSpeed();
-      }
-#endif
       // don't autosave profile, so that one can do "save as" without overwriting the current profile
 
       currentState = Settings;
@@ -373,7 +363,6 @@ bool menu_editNumericalValue(const Menu::Action_t action) {
   }
   return(EXIT_SUCCESS);
 }
-
 
 // ----------------------------------------------------------------------------
 
@@ -391,14 +380,13 @@ void factoryReset() {
     saveParameters(i);
   }
 
-#ifdef WITH_FAN
-  fanAssistSpeed = FACTORY_FAN_ASSIST_SPEED;
-  saveFanSpeed();
-#endif // WITH_FAN
+  heaterPID.soakKp = FACTORY_KP; // 0.60; 
+  heaterPID.soakKi = FACTORY_KI; //0.01;
+  heaterPID.soakKd = FACTORY_KD; //19.70;
 
-  heaterPID.Kp = FACTORY_KP; // 0.60; 
-  heaterPID.Ki = FACTORY_KI; //0.01;
-  heaterPID.Kd = FACTORY_KD; //19.70;
+  heaterPID.peakKp = FACTORY_KP; // 0.60; 
+  heaterPID.peakKi = FACTORY_KI; //0.01;
+  heaterPID.peakKd = FACTORY_KD; //19.70;
   savePID();
 
   activeProfileId = 0;
@@ -478,7 +466,6 @@ void loadProfile(unsigned int targetProfile) {
 
   delay(500);
 }
-
 
 // ----------------------------------------------------------------------------
 
@@ -591,31 +578,27 @@ void renderMenuItem(const Menu::Item_t *mi, uint8_t pos) {
 // ----------------------------------------------------------------------------
 //       Name,             Label,           Next,           Previous,       Parent,         Child,          Callback
 
-MenuItem(miExit,           "",              Menu::NullItem, Menu::NullItem, Menu::NullItem, miCycleStart,   menuExit);
-MenuItem(miCycleStart,    "Start Cycle",    miEditProfile,  Menu::NullItem, miExit,         Menu::NullItem, menu_cycleStart);
-MenuItem(miEditProfile,   "Edit Profile",   miLoadProfile,  miCycleStart,   miExit,         miRampUpRate,   menuDummy);
-  MenuItem(miRampUpRate,  "Ramp up  ",      miSoakTempA,    Menu::NullItem, miEditProfile,  Menu::NullItem, menu_editNumericalValue);
-  MenuItem(miSoakTempA,   "Soak temp A",    miSoakTempB,    miRampUpRate,   miEditProfile,  Menu::NullItem, menu_editNumericalValue);
-  MenuItem(miSoakTempB,   "Soak temp B",    miSoakTime,     miSoakTempA,    miEditProfile,  Menu::NullItem, menu_editNumericalValue);
-  MenuItem(miSoakTime,    "Soak time",      miPeakTemp,     miSoakTempB,    miEditProfile,  Menu::NullItem, menu_editNumericalValue);
-  MenuItem(miPeakTemp,    "Peak temp",      miPeakTime,     miSoakTime,     miEditProfile,  Menu::NullItem, menu_editNumericalValue);
-  MenuItem(miPeakTime,    "Peak time",      miRampDnRate,   miPeakTemp,     miEditProfile,  Menu::NullItem, menu_editNumericalValue);
-  MenuItem(miRampDnRate,  "Ramp down",      Menu::NullItem, miPeakTime,     miEditProfile,  Menu::NullItem, menu_editNumericalValue);
-MenuItem(miLoadProfile,   "Load Profile",   miSaveProfile,  miEditProfile,  miExit,         Menu::NullItem, menu_saveLoadProfile);
-#ifdef WITH_FAN
-MenuItem(miSaveProfile,   "Save Profile",   miFanSettings,  miLoadProfile,  miExit,         Menu::NullItem, menu_saveLoadProfile);
-MenuItem(miFanSettings,   "Fan Speed",      miPidSettings,  miSaveProfile,  miExit,         Menu::NullItem, menu_editNumericalValue);
-MenuItem(miPidSettings,   "PID Settings",   miFactoryReset, miFanSettings,  miExit,         miPidTune,  menuDummy);
-#else
-MenuItem(miSaveProfile,   "Save Profile",   miPidSettings,  miLoadProfile,  miExit,         Menu::NullItem, menu_saveLoadProfile);
-MenuItem(miPidSettings,   "PID Settings",   miFactoryReset, miSaveProfile,  miExit,         miPidTune,  menuDummy);
-#endif // WITH FAN
-  MenuItem(miPidTune,     "PID Autotune",   miPidSettingP,  Menu::NullItem, miPidSettings,  Menu::NullItem, menu_cycleStart);
-  MenuItem(miPidSettingP, "Heater Kp",      miPidSettingI,  miPidTune,      miPidSettings,  Menu::NullItem, menu_editNumericalValue);
-  MenuItem(miPidSettingI, "Heater Ki",      miPidSettingD,  miPidSettingP,  miPidSettings,  Menu::NullItem, menu_editNumericalValue);
-  MenuItem(miPidSettingD, "Heater Kd",      Menu::NullItem, miPidSettingI,  miPidSettings,  Menu::NullItem, menu_editNumericalValue);
-MenuItem(miFactoryReset,  "Factory Reset",  Menu::NullItem, miPidSettings,  miExit,         Menu::NullItem, menu_factoryReset);
-
+MenuItem(miExit,           "",                Menu::NullItem, Menu::NullItem, Menu::NullItem, miCycleStart,   menuExit);
+MenuItem(miCycleStart,    "Start Cycle",      miEditProfile,  Menu::NullItem, miExit,         Menu::NullItem, menu_cycleStart);
+MenuItem(miEditProfile,   "Edit Profile",     miLoadProfile,  miCycleStart,   miExit,         miRampUpRate,   menuDummy);
+  MenuItem(miRampUpRate,  "Ramp up  ",          miSoakTempA,    Menu::NullItem, miEditProfile,  Menu::NullItem, menu_editNumericalValue);
+  MenuItem(miSoakTempA,   "Soak temp A",        miSoakTempB,    miRampUpRate,   miEditProfile,  Menu::NullItem, menu_editNumericalValue);
+  MenuItem(miSoakTempB,   "Soak temp B",        miSoakTime,     miSoakTempA,    miEditProfile,  Menu::NullItem, menu_editNumericalValue);
+  MenuItem(miSoakTime,    "Soak time",          miPeakTemp,     miSoakTempB,    miEditProfile,  Menu::NullItem, menu_editNumericalValue);
+  MenuItem(miPeakTemp,    "Peak temp",          miPeakTime,     miSoakTime,     miEditProfile,  Menu::NullItem, menu_editNumericalValue);
+  MenuItem(miPeakTime,    "Peak time",          miRampDnRate,   miPeakTemp,     miEditProfile,  Menu::NullItem, menu_editNumericalValue);
+  MenuItem(miRampDnRate,  "Ramp down",          Menu::NullItem, miPeakTime,     miEditProfile,  Menu::NullItem, menu_editNumericalValue);
+MenuItem(miLoadProfile,   "Load Profile",     miSaveProfile,  miEditProfile,  miExit,         Menu::NullItem, menu_saveLoadProfile);
+MenuItem(miSaveProfile,   "Save Profile",     miPidSettings,  miLoadProfile,  miExit,         Menu::NullItem, menu_saveLoadProfile);
+MenuItem(miPidSettings,   "PID Settings",     miFactoryReset, miSaveProfile,  miExit,         miPidTune,  menuDummy);
+  MenuItem(miPidTune,     "Start PID Autotune", miPidSoakP,     Menu::NullItem, miPidSettings,  Menu::NullItem, menu_cycleStart);
+  MenuItem(miPidSoakP,    "Soak Kp  ",          miPidSoakI,     miPidTune,      miPidSettings,  Menu::NullItem, menu_editNumericalValue);
+  MenuItem(miPidSoakI,    "Soak Ki  ",          miPidSoakD,     miPidSoakP,     miPidSettings,  Menu::NullItem, menu_editNumericalValue);
+  MenuItem(miPidSoakD,    "Soak Kd  ",          miPidPeakP,     miPidSoakI,     miPidSettings,  Menu::NullItem, menu_editNumericalValue);
+  MenuItem(miPidPeakP,    "Peak Kp  ",          miPidPeakI,     miPidSoakD,     miPidSettings,  Menu::NullItem, menu_editNumericalValue);
+  MenuItem(miPidPeakI,    "Peak Ki  ",          miPidPeakD,     miPidPeakP,     miPidSettings,  Menu::NullItem, menu_editNumericalValue);
+  MenuItem(miPidPeakD,    "Peak Kd  ",          Menu::NullItem, miPidPeakI,     miPidSettings,  Menu::NullItem, menu_editNumericalValue);
+MenuItem(miFactoryReset,  "Factory Reset",    Menu::NullItem, miPidSettings,  miExit,         Menu::NullItem, menu_factoryReset);
 
 // ----------------------------------------------------------------------------
 void drawInitialProcessDisplay()
@@ -636,8 +619,12 @@ void drawInitialProcessDisplay()
     if(currentState == PreTune) {
       tft.print("Tuning ");
       
-      estimatedTotalTime = 300;
-      maxTemp = 300;
+      // estimate total run time for current profile
+      estimatedTotalTime = 360;
+      estimatedTotalTime += (activeProfile.peakTemp - actualTemperature)/(float)activeProfile.rampUpRate;
+      estimatedTotalTime += (activeProfile.peakTemp - actualTemperature)/(float)activeProfile.rampDownRate;
+      estimatedTotalTime *= 1.1; // add some spare
+      maxTemp = activeProfile.peakTemp + 20;
 
     } else {
       tft.print("Profile ");
@@ -778,13 +765,6 @@ void updateProcessDisplay() {
   alignRightPrefix((int)heaterPower); 
   tft.print((int)heaterPower);
   tft.print('%');
-
-#ifdef WITH_FAN
-  tft.print(" \x2a");
-  alignRightPrefix((int)fanValue); 
-  tft.print((int)fanValue);
-  tft.print('%');
-#endif // WITH_FAN
 
   tft.print(" \x12 "); // alternative: \x7f
   printDouble(rampRate);

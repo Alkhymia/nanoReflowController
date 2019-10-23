@@ -4,9 +4,6 @@
 //#define ALWAYS_FIRST_RUN
 //#define FAKE_HW 1
 //#define WITH_BEEPER // Enables Beeper
-//#define WITH_FAN    // Enables Fan
-//#define WITH_SERVO  // Enables Lid opening Servo (not yet implemented)
-//#define SERIAL_VERBOSE
 #define DEBUG 2
 
 // run a calibration loop that measures how many timer ticks occur between 2 zero corssings
@@ -29,9 +26,6 @@ static const uint8_t PIN_TC_CS   = A1;
 static const uint8_t PIN_TC_DO   = 12;
 static const uint8_t PIN_TC_CLK  = 13;
 static const uint8_t PIN_HEATER  = 3;  // Heater Out
-#ifdef WITH_FAN
-  static const uint8_t PIN_FAN     = A0; // Fan Out
-#endif
 #ifdef WITH_BEEPER
   static const uint8_t PIN_BEEPER  = A5; // Beeper Out
 #endif
@@ -60,7 +54,6 @@ static const uint8_t DEFAULT_PEAK_TEPM        = 230;
 static const uint8_t DEFAULT_PEAK_DURATION    = 20;
 static const float DEFAULT_RAMP_UP_RATE       = 1.2; // degrees / second (keep it about 1/2 of maximum to prevent PID overshooting)
 static const float DEFAULT_RAMP_DOWN_RATE     = 2.0; // degrees / second
-static const uint8_t FACTORY_FAN_ASSIST_SPEED = 33;
 
 /*
 Kp: Determines how aggressively the PID reacts to the current amount of error (Proportional) (double >=0)

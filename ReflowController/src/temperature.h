@@ -23,16 +23,15 @@ void readThermocouple() {
     actualTemperature = reading;
     tcStat = 0;
   }
-  
-#ifdef SERIAL_VERBOSE
-  Serial.print("Temperature: ");
-  Serial.print(actualTemperature);
-  Serial.println(" °C");
-#endif
+
+  #ifdef SERIAL_VERBOSE
+    Serial.print("Temperature: ");
+    Serial.print(actualTemperature);
+    Serial.println(" °C");
+  #endif
   digitalHigh(PIN_TC_CS);
 
   if (lcdState == 0) digitalLow(PIN_LCD_CS);
-
 }
 
 #endif // TEMPERATURE_H

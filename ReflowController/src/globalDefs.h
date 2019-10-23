@@ -15,7 +15,7 @@
 static const uint8_t TICKS_PER_UPDATE     = 50; // 25 makes my MAX6675 keeps outputting the same value even when temperature changes
 static const uint8_t TICKS_TO_REDRAW      = 50; // 
 
-const char * ver = "3.2";
+const char * ver = "3.3";
 
 double actualTemperature;
 uint8_t tcStat = 0;
@@ -23,34 +23,26 @@ uint8_t tcStat = 0;
 double heaterSetpoint;
 double heaterInput;
 double heaterOutput;
-uint16_t tuningSetTemp = 150;
 
-#ifdef WITH_FAN
-  uint8_t fanValue;
-#endif // WITH_FAN
 uint8_t heaterPower;
 double rampRate = 0;
 
 // ----------------------------------
 typedef struct {
-  double Kp;
-  double Ki;
-  double Kd;
+  double soakKp;
+  double soakKi;
+  double soakKd;
+  double peakKp;
+  double peakKi;
+  double peakKd;
 } PID_t;
 
-PID_t heaterPID = { FACTORY_KP, FACTORY_KI, FACTORY_KD };
-#ifdef WITH_FAN
-  PID_t fanPID    = { 1.00, 0.00, 0.00 };
-#endif // WITH_FAN
+PID_t heaterPID = { FACTORY_KP, FACTORY_KI, FACTORY_KD, FACTORY_KP, FACTORY_KI, FACTORY_KD };
 
 int idleTemp = 50; // the temperature at which to consider the oven safe to leave to cool naturally
 uint32_t startCycleZeroCrossTicks;
 volatile uint32_t zeroCrossTicks = 0;
 char buf[20]; // generic char buffer
-
-#ifdef WITH_FAN
-  int fanAssistSpeed = 33; // default fan speed
-#endif // WITH_FAN
 
 // ----------------------------------------------------------------------------
 // state machine
@@ -73,7 +65,8 @@ typedef enum {
   Complete = 20,
 
   PreTune = 30,
-  Tune
+  TuneSoak,
+  TunePeak
 } State;
 
 State currentState  = Idle;

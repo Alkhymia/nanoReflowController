@@ -10,20 +10,19 @@
 #include <PID_v1.h>
 #include <SPI.h>
 #include <PDQ_GFX.h>             // PDQ: Core graphics library
-#include "PDQ_ST7735_config.h"   // PDQ: ST7735 pins and other setup for this sketch
+#include <PDQ_ST7735_config.h>   // PDQ: ST7735 pins and other setup for this sketch
 #include <PDQ_ST7735.h>          // PDQ: Hardware-specific driver library
 #include <Menu.h>
 #include <ClickEncoder.h>
 #include <TimerOne.h>
-#include "max6675.h"
+#include <max6675.h>
+#include <pidautotuner.h>
 
 #include "portMacros.h"
 #include "temperature.h"
 #include "helpers.h"
 #include "UI.h"
 #include "globalDefs.h"
-
-#include <pidautotuner.h>
 
 // ----------------------------------------------------------------------------
 volatile uint32_t    timerTicks       = 0;
@@ -37,9 +36,10 @@ bool     stateChanged      = false;
 uint32_t stateChangedTicks = 0;
 // ----------------------------------------------------------------------------
 // PID
-PID myPID(&heaterInput, &heaterOutput, &heaterSetpoint, heaterPID.Kp, heaterPID.Ki, heaterPID.Kd, DIRECT);
+PID myPID(&heaterInput, &heaterOutput, &heaterSetpoint, heaterPID.soakKp, heaterPID.soakKi, heaterPID.soakKd, DIRECT);
 
 PIDAutotuner tuner = PIDAutotuner();
+PIDAutotuner tuner2 = PIDAutotuner();
 
 /*************************************/
 /*************************************/
@@ -63,39 +63,29 @@ uint8_t thermocoupleErrorCount;
 // Ensure that Solid State Relais are off when starting
 //
 void setupPins(void) {
-
-pinAsOutput(PIN_HEATER);
-digitalLow(PIN_HEATER); // off
-#ifdef WITH_FAN
-  pinAsOutput(PIN_FAN);
-  digitalHigh(PIN_FAN);
-#endif // WITH_FAN
-pinAsInputPullUp(PIN_ZX);
-pinAsOutput(PIN_TC_CS);
-pinAsOutput(PIN_LCD_CS);
-pinAsOutput(PIN_TC_CS);
-#ifdef WITH_BEEPER
-  pinAsOutput(PIN_BEEPER);
-#endif // WITH_BEEPER
-
+  pinAsOutput(PIN_HEATER);
+  digitalLow(PIN_HEATER); // off
+  pinAsInputPullUp(PIN_ZX);
+  pinAsOutput(PIN_TC_CS);
+  pinAsOutput(PIN_LCD_CS);
+  pinAsOutput(PIN_TC_CS);
+  #ifdef WITH_BEEPER
+    pinAsOutput(PIN_BEEPER);
+  #endif // WITH_BEEPER
 }
 // ----------------------------------------------------------------------------
 void killRelayPins(void) {
-Timer1.stop();
-detachInterrupt(INT_ZX);
-#ifdef WITH_FAN
-  digitalHigh(PIN_FAN);
-#endif // WITH_FAN
-digitalHigh(PIN_HEATER);
+  Timer1.stop();
+  detachInterrupt(INT_ZX);
+  digitalHigh(PIN_HEATER);
 }
 
 // ----------------------------------------------------------------------------
 // wave packet control: only turn the solid state relais on for a percentage 
 // of complete sinusoids (i.e. 1x 360°)
 
-#define CHANNELS       2
+#define CHANNELS       1
 #define CHANNEL_HEATER 0
-#define CHANNEL_FAN    1
 
 typedef struct Channel_s {
   volatile uint8_t target; // percentage of on-time
@@ -107,11 +97,7 @@ typedef struct Channel_s {
 
 Channel_t Channels[CHANNELS] = {
   // heater
-  { 0, 0, 0, false, PIN_HEATER }, 
-#ifdef WITH_FAN
-  // fan
-  { 0, 0, 0, false, PIN_FAN } 
-#endif // WITH_FAN
+  { 0, 0, 0, false, PIN_HEATER }
 };
 
 // delay to align relay activation with the actual zero crossing
@@ -170,20 +156,6 @@ void zeroCrossingIsr(void) {
 void timerIsr(void) { // ticks with 100µS
   static uint32_t lastTicks = 0;
 
-  #ifdef WITH_FAN
-    // phase control for the fan 
-    if (++phaseCounter > 90) {
-      phaseCounter = 0;
-    }
-
-    if (phaseCounter > Channels[CHANNEL_FAN].target) {
-      digitalLow(Channels[CHANNEL_FAN].pin); 
-    }
-    else {
-      digitalHigh(Channels[CHANNEL_FAN].pin);
-    }
-  #endif //WITH_FAN
-
   // wave packet control for heater
   if (Channels[CHANNEL_HEATER].next > lastTicks // FIXME: this looses ticks when overflowing
       && timerTicks > Channels[CHANNEL_HEATER].next) 
@@ -237,8 +209,7 @@ void setup() {
   }
  
   do {
-    // wait for MAX chip to stabilize
-   delay(500);
+   delay(500); // wait for MAX chip to stabilize
    readThermocouple();
   }
   while ((tcStat > 0) && (thermocoupleErrorCount++ < TC_ERROR_TOLERANCE));
@@ -253,9 +224,6 @@ void setup() {
     airTemp[i].temp = actualTemperature;
   }
 
-#ifdef WITH_FAN
-  loadFanSpeed();
-#endif // WITH_FAN
   loadPID();
 
   myPID.SetOutputLimits(0, 100); // max output 100%
@@ -467,7 +435,7 @@ void loop(void)
           heaterOutput = 50;
           myPID.SetMode(AUTOMATIC);
           myPID.SetControllerDirection(DIRECT);
-          myPID.SetTunings(heaterPID.Kp, heaterPID.Ki, heaterPID.Kd);
+          myPID.SetTunings(heaterPID.soakKp, heaterPID.soakKi, heaterPID.soakKd);
           heaterSetpoint = heaterInput;
           #ifdef WITH_BEEPER
               tone(PIN_BEEPER,BEEP_FREQ,100);
@@ -499,6 +467,7 @@ void loop(void)
         if (stateChanged) {
           stateChanged = false;
           lastRampTicks = zeroCrossTicks;
+          myPID.SetTunings(heaterPID.peakKp, heaterPID.peakKi, heaterPID.peakKd);
         }
 
         updateRampSetpoint();
@@ -525,16 +494,10 @@ void loop(void)
           stateChanged = false;
           lastRampTicks = zeroCrossTicks;
           myPID.SetControllerDirection(REVERSE);
-          #ifdef WITH_FAN
-            myPID.SetTunings(fanPID.Kp, fanPID.Ki, fanPID.Kd);
-          #endif // WITH_FAN
           heaterSetpoint = activeProfile.peakTemp - 15; // get it all going with a bit of a kick! v sluggish here otherwise, too hot too long
           #ifdef WITH_BEEPER
             tone(PIN_BEEPER, BEEP_FREQ, 3000);  // Beep as a reminder that CoolDown starts (and maybe open up the oven door for fast enough cooldown)
           #endif // WITH_BEEPER
-          #ifdef WITH_SERVO       
-          // TODO: implement servo operated lid
-          #endif // WITH_SERVO
         }
 
         updateRampSetpoint(true);
@@ -548,9 +511,6 @@ void loop(void)
         if (stateChanged) {
           stateChanged = false;
           myPID.SetControllerDirection(REVERSE);
-          #ifdef WITH_FAN
-            myPID.SetTunings(fanPID.Kp, fanPID.Ki, fanPID.Kd);
-          #endif // WITH_FAN
           heaterSetpoint = idleTemp;
         }
 
@@ -570,84 +530,119 @@ void loop(void)
 
       case PreTune:
         if (stateChanged) {
-          #if DEBUG >= 1
+         #if DEBUG >= 1
             Serial.println("Started Pretune");
           #endif
           stateChanged = false;
         	myPID.SetMode(MANUAL);
-        	heaterSetpoint = tuningSetTemp;
+        	heaterSetpoint = round((activeProfile.soakTempA + activeProfile.soakTempB) / 2);
           heaterOutput = 100;
         }
 
-        if (actualTemperature >=  tuningSetTemp - 20) {
-          currentState = Tune;
+        if (actualTemperature >=  heaterSetpoint - 20) {
+          currentState = TuneSoak;
         }
-
         break;
 
-      case Tune:
+      case TuneSoak:
+        if (stateChanged) {
+          #if DEBUG >= 1
+            Serial.println("Soak Tuning started");
+          #endif 
+          stateChanged = false;
+          //heaterSetpoint = round((activeProfile.soakTempA + activeProfile.soakTempB) / 2);
+
+          tuner.setTargetInputValue(heaterSetpoint);
+          tuner.setLoopInterval(100000);
+          tuner.setOutputRange(0, 100);
+          tuner.setZNMode(PIDAutotuner::ZNModeLessOvershoot);
+          tuner.startTuningLoop();
+        }
+
+        if (tuner.isFinished()) {
+          currentState = TunePeak;
+
+          heaterPID.soakKp = tuner.getKp();
+          heaterPID.soakKi = tuner.getKi();
+          heaterPID.soakKd = tuner.getKd();
+
+          #if DEBUG >= 1
+            Serial.println("Soak Tuning Finished");
+            Serial.print("Soak Kp: ");
+            Serial.println(heaterPID.soakKp);
+            Serial.print("Soak Ki: ");
+            Serial.println(heaterPID.soakKi);
+            Serial.print("Soak Kd: ");
+            Serial.println(heaterPID.soakKd);
+          #endif // DEBUG
+
+        }
+        break;    
+
+      case TunePeak:
         {
           if (stateChanged) {
             #if DEBUG >= 1
-              Serial.println("Started Tune");
+              Serial.println("Peak tuning started");
             #endif
             stateChanged = false;
-            heaterSetpoint = tuningSetTemp;
+            heaterSetpoint = activeProfile.peakTemp;
             
-            tuner.setTargetInputValue(tuningSetTemp);
-            //tuner.setLoopInterval(TICKS_TO_REDRAW / TICKS_PER_SEC * 1000000); // time between PID in µS
-            tuner.setLoopInterval(100000);
-            tuner.setOutputRange(0, 100);
-            tuner.setZNMode(PIDAutotuner::ZNModeBasicPID);
+            tuner.setTargetInputValue(activeProfile.peakTemp);
             tuner.startTuningLoop();
           }
 
-          // Get input value here (temperature, encoder position, velocity, etc)
-          //double input = actualTemperature;
-
-          // Call tunePID() with the input value
-          //double pidoutput = tuner.tunePID(input);
-
-          // Set the output - tunePid() will return values within the range configured
-          // by setOutputRange(). Don't change the value or the tuning results will be
-          // incorrect.
-          //heaterOutput = pidoutput;
-
-
-       
           if (tuner.isFinished()) {
-            // Turn the output off here.
             heaterOutput = 0;
             currentState = CoolDown;
 
-            // Get PID gains - set your PID controller's gains to these
-            heaterPID.Kp = tuner.getKp();
-            heaterPID.Ki = tuner.getKi();
-            heaterPID.Kd = tuner.getKd();
+            heaterPID.peakKp = tuner.getKp();
+            heaterPID.peakKi = tuner.getKi();
+            heaterPID.peakKd = tuner.getKd();
 
             savePID();
 
-            tft.setCursor(40, 40);
+            tft.fillRect(10, 40, 120, 60, ST7735_RED);
+            tft.setTextColor(ST7735_WHITE, ST7735_RED);
+
+            tft.setCursor(50, 50);
+            tft.print("Soak");
+            tft.setCursor(90, 50);
+            tft.print("Peak");
+
+            tft.setCursor(20, 60);
             tft.print("Kp: "); 
-            printDouble(heaterPID.Kp);
-            tft.setCursor(40, 50);
+            tft.setCursor(20, 70);
             tft.print("Ki: "); 
-            printDouble(heaterPID.Ki);
-            tft.setCursor(40, 60);
+            tft.setCursor(20, 80);
             tft.print("Kd: "); 
-            printDouble(heaterPID.Kd);
+
+            tft.setCursor(50, 60);
+            printDouble(heaterPID.soakKp);
+            tft.setCursor(50, 70);
+            printDouble(heaterPID.soakKi);
+            tft.setCursor(50, 80);
+            printDouble(heaterPID.soakKd);
+
+            tft.setCursor(90, 60);
+            printDouble(heaterPID.peakKp);
+            tft.setCursor(90, 70);
+            printDouble(heaterPID.peakKi);
+            tft.setCursor(90, 80);
+            printDouble(heaterPID.peakKd);
 
             #if DEBUG >= 1
-              Serial.println("Tuning Finished");
-              Serial.print("Heater Kp: ");
-              Serial.println(heaterPID.Kp);
-              Serial.print("Heater Ki: ");
-              Serial.println(heaterPID.Ki);
-              Serial.print("Heater Kd: ");
-              Serial.println(heaterPID.Kd);
+              Serial.println("Peak Tuning finished");
+              Serial.print("Peak Kp: ");
+              Serial.println(heaterPID.peakKp);
+              Serial.print("Peak Ki: ");
+              Serial.println(heaterPID.peakKi);
+              Serial.print("Peak Kd: ");
+              Serial.println(heaterPID.peakKd);
             #endif // DEBUG
           }
         }
+        break;      
 
       default:
         break;
@@ -666,17 +661,9 @@ void loop(void)
   if (currentState == RampToSoak || currentState == Soak || currentState == RampUp || currentState == Peak || currentState == PreTune) {
     myPID.Compute();
     heaterPower = heaterOutput;
-  } else if (currentState == Tune) {
+  } else if (currentState == TuneSoak || currentState == TunePeak) {
     milliseconds = millis();
     heaterPower = tuner.tunePID(actualTemperature);
-    #if DEBUG >= 2
-      Serial.print("ms: ");
-      Serial.print(millis());
-      Serial.print(" - Temp: ");
-      Serial.print(actualTemperature);
-      Serial.print(" - Output: ");
-      Serial.println(heaterPower);
-    #endif // DEBUG
     while (millis() - milliseconds < 100) delay(1);
   } else {
     heaterPower = 0;
@@ -684,11 +671,6 @@ void loop(void)
 
 
   Channels[CHANNEL_HEATER].target = heaterPower;
-
-  #ifdef WITH_FAN
-    double fanTmp = 90.0 / 100.0 * fanValue; // 0-100% -> 0-90° phase control
-    Channels[CHANNEL_FAN].target = 90 - (uint8_t)fanTmp;
-  #endif // WITH_FAN
 }
 
 
