@@ -1,10 +1,12 @@
 // ----------------------------------------------------------------------------
-// Reflow Oven Controller
+// nano Reflow Oven Controller
+// (c) 2019 Gerrit Sturm
 // (c) 2017 Debugged and restructured by David Sanz Kirbis
 // (c) 2014 Karl Pitrich <karl@pitrich.com>
 // (c) 2012-2013 Ed Simmons
 // ----------------------------------------------------------------------------
 
+#include <Arduino.h>
 #include <avr/eeprom.h>
 #include <EEPROM.h>
 #include <PID_v1.h>
@@ -24,25 +26,21 @@
 #include "UI.h"
 #include "globalDefs.h"
 
-// ----------------------------------------------------------------------------
+
 volatile uint32_t    timerTicks       = 0;
 volatile uint8_t     phaseCounter     = 0;
 static const uint8_t TIMER1_PERIOD_US = 100;
-// ----------------------------------------------------------------------------
+
 uint32_t lastUpdate        = 0;
 uint32_t lastDisplayUpdate = 0;
 State    previousState     = Idle;
 bool     stateChanged      = false;
 uint32_t stateChangedTicks = 0;
+
 // ----------------------------------------------------------------------------
 // PID
 PID myPID(&heaterInput, &heaterOutput, &heaterSetpoint, heaterPID.soakKp, heaterPID.soakKi, heaterPID.soakKd, DIRECT);
-
 PIDAutotuner tuner = PIDAutotuner();
-PIDAutotuner tuner2 = PIDAutotuner();
-
-/*************************************/
-/*************************************/
 
 typedef struct {
   double temp;
@@ -53,15 +51,15 @@ Temp_t airTemp[NUM_TEMP_READINGS];
 
 double readingsT1[NUM_TEMP_READINGS]; // the readings used to make a stable temp rolling average
 double runningTotalRampRate;
-double rateOfRise = 0;          // the result that is displayed
-double totalT1 = 0;             // the running total
-double averageT1 = 0;           // the average
-uint8_t index = 0;              // the index of the current reading
+double rateOfRise = 0;                // the result that is displayed
+double totalT1 = 0;                   // the running total
+double averageT1 = 0;                 // the average
+uint8_t index = 0;                     // the index of the current reading
 uint8_t thermocoupleErrorCount;
 
 // ----------------------------------------------------------------------------
 // Ensure that Solid State Relais are off when starting
-//
+
 void setupPins(void) {
   pinAsOutput(PIN_HEATER);
   digitalLow(PIN_HEATER); // off
@@ -73,11 +71,38 @@ void setupPins(void) {
     pinAsOutput(PIN_BEEPER);
   #endif // WITH_BEEPER
 }
-// ----------------------------------------------------------------------------
+
 void killRelayPins(void) {
   Timer1.stop();
   detachInterrupt(INT_ZX);
   digitalHigh(PIN_HEATER);
+}
+
+void saveProfile(unsigned int targetProfile, bool quiet) {
+  activeProfileId = targetProfile;
+
+  if (!quiet) {
+    memoryFeedbackScreen(activeProfileId, false);
+  }
+  saveParameters(activeProfileId); // activeProfileId is modified by the menu code directly, this method is called by a menu action
+
+  if (!quiet) delay(500);
+}
+
+#define WITH_CHECKSUM 1
+
+bool firstRun() { 
+  #ifndef ALWAYS_FIRST_RUN
+    // if all bytes of a profile in the middle of the eeprom space are 255, we assume it's a first run
+    unsigned int offset = 15 * sizeof(Profile_t);
+
+    for (uint16_t i = offset; i < offset + sizeof(Profile_t); i++) {
+      if (EEPROM.read(i) != 255) {
+        return false;
+      }
+    }
+  #endif // ALWAYS_FIRST_RUN
+  return true;
 }
 
 // ----------------------------------------------------------------------------
@@ -96,7 +121,6 @@ typedef struct Channel_s {
 } Channel_t;
 
 Channel_t Channels[CHANNELS] = {
-  // heater
   { 0, 0, 0, false, PIN_HEATER }
 };
 
@@ -160,8 +184,8 @@ void timerIsr(void) { // ticks with 100µS
   if (Channels[CHANNEL_HEATER].next > lastTicks // FIXME: this looses ticks when overflowing
       && timerTicks > Channels[CHANNEL_HEATER].next) 
   {
-    if (Channels[CHANNEL_HEATER].action) digitalLow(Channels[CHANNEL_HEATER].pin); //digitalWriteFast(Channels[CHANNEL_HEATER].pin, HIGH);
-    else digitalHigh(Channels[CHANNEL_HEATER].pin);//digitalWriteFast(Channels[CHANNEL_HEATER].pin, LOW);
+    if (Channels[CHANNEL_HEATER].action) digitalLow(Channels[CHANNEL_HEATER].pin);
+    else digitalHigh(Channels[CHANNEL_HEATER].pin);
     lastTicks = timerTicks;
   }
 
@@ -424,7 +448,10 @@ void loop(void)
       if (currentState > UIMenuEnd) {
         updateProcessDisplay();
       }
-      else displayThermocoupleData(1, tft.height()-16);
+      else {
+        displayThermocoupleData(1, tft.height()-16);
+        displayHeaterPowerData(tft.width()-35, tft.height()-10);
+      }
     }
 
     switch (currentState) {
@@ -665,38 +692,14 @@ void loop(void)
     milliseconds = millis();
     heaterPower = tuner.tunePID(actualTemperature);
     while (millis() - milliseconds < 100) delay(1);
+  } else if (currentState == Edit && MenuEngine.currentItem==&miManual) {
+    heaterSetpoint = encAbsolute;
+    myPID.Compute();
+    heaterPower = heaterOutput;
+//      Serial.print("Manual Heating:");Serial.println(powerHeater);
   } else {
     heaterPower = 0;
   }
 
-
   Channels[CHANNEL_HEATER].target = heaterPower;
-}
-
-
-void saveProfile(unsigned int targetProfile, bool quiet) {
-  activeProfileId = targetProfile;
-
-  if (!quiet) {
-    memoryFeedbackScreen(activeProfileId, false);
-  }
-  saveParameters(activeProfileId); // activeProfileId is modified by the menu code directly, this method is called by a menu action
-
-  if (!quiet) delay(500);
-}
-
-#define WITH_CHECKSUM 1
-
-bool firstRun() { 
-  #ifndef ALWAYS_FIRST_RUN
-    // if all bytes of a profile in the middle of the eeprom space are 255, we assume it's a first run
-    unsigned int offset = 15 * sizeof(Profile_t);
-
-    for (uint16_t i = offset; i < offset + sizeof(Profile_t); i++) {
-      if (EEPROM.read(i) != 255) {
-        return false;
-      }
-    }
-  #endif
-  return true;
 }

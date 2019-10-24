@@ -92,10 +92,12 @@ void displaySplash() {
   tft.setCursor(52, 67);
   tft.print("v"); tft.print(ver);
   
-  tft.setCursor(0, 109);
+  tft.setCursor(0, 99);
   tft.print("(c)2014 karl@pitrich.com");
-  tft.setCursor(0, 119);
+  tft.setCursor(0, 109);
   tft.print("(c)2017 Dasaki");
+  tft.setCursor(0, 119);
+  tft.print("(c)2019 Gaggi");
   delay(3000);
 }
 
@@ -168,6 +170,17 @@ void displayThermocoupleData(uint8_t xpos, uint8_t ypos) {
       tft.print("---");
       break;
   }
+}
+
+void displayHeaterPowerData(uint8_t xpos, uint8_t ypos) {
+  tft.setCursor(xpos, ypos);
+  tft.setTextSize(1);
+  tft.setTextColor(ST7735_BLACK, ST7735_WHITE);
+
+  tft.print("\xef");
+  alignRightPrefix((int)heaterPower); 
+  tft.print((int)heaterPower);
+  tft.print('%');
 }
 
 // ----------------------------------------------------------------------------
@@ -362,6 +375,39 @@ bool menu_editNumericalValue(const Menu::Action_t action) {
     return true;
   }
   return(EXIT_SUCCESS);
+}
+
+bool menu_manualHeating(const Menu::Action_t action) {
+  if (action == Menu::actionDisplay) {
+    bool initial = currentState != Edit;
+    currentState = Edit;
+
+    tft.setTextSize(1);
+    if (initial) {
+      tft.setTextColor(ST7735_BLACK, ST7735_WHITE);
+      tft.setCursor(MENU_TEXT_XPOS, 80);
+      tft.print("click to stop.");
+      Encoder.setAccelerationEnabled(true);
+      Serial.println("inital");
+    }
+  
+    if (encAbsolute > 250) encAbsolute = 250;
+    if (encAbsolute <  0) encAbsolute =  0;
+
+    tft.setCursor(10, 60);
+    tft.print("Temp:  ");
+    tft.setTextColor(ST7735_WHITE, ST7735_RED);
+    tft.print(encAbsolute);
+    tft.setTextColor(ST7735_BLACK, ST7735_WHITE);    
+    tft.print("\367C  ");
+  }
+  else if ((action == Menu::actionParent || action == Menu::actionTrigger ) && currentState == Edit) 
+  {
+    currentState = Settings;
+    clearLastMenuItemRenderState();
+  }
+  return true;
+  
 }
 
 // ----------------------------------------------------------------------------
@@ -576,11 +622,12 @@ void renderMenuItem(const Menu::Item_t *mi, uint8_t pos) {
 }
 
 // ----------------------------------------------------------------------------
-//       Name,             Label,           Next,           Previous,       Parent,         Child,          Callback
+//       Name,             Label,             Next,           Previous,       Parent,         Child,          Callback
 
 MenuItem(miExit,           "",                Menu::NullItem, Menu::NullItem, Menu::NullItem, miCycleStart,   menuExit);
-MenuItem(miCycleStart,    "Start Cycle",      miEditProfile,  Menu::NullItem, miExit,         Menu::NullItem, menu_cycleStart);
-MenuItem(miEditProfile,   "Edit Profile",     miLoadProfile,  miCycleStart,   miExit,         miRampUpRate,   menuDummy);
+MenuItem(miCycleStart,    "Start Cycle",      miManual,       Menu::NullItem, miExit,         Menu::NullItem, menu_cycleStart);
+MenuItem(miManual,        "Manual Heating",   miEditProfile,  miCycleStart,   miExit,         Menu::NullItem, menu_manualHeating);
+MenuItem(miEditProfile,   "Edit Profile",     miLoadProfile,  miManual,       miExit,         miRampUpRate,   menuDummy);
   MenuItem(miRampUpRate,  "Ramp up  ",          miSoakTempA,    Menu::NullItem, miEditProfile,  Menu::NullItem, menu_editNumericalValue);
   MenuItem(miSoakTempA,   "Soak temp A",        miSoakTempB,    miRampUpRate,   miEditProfile,  Menu::NullItem, menu_editNumericalValue);
   MenuItem(miSoakTempB,   "Soak temp B",        miSoakTime,     miSoakTempA,    miEditProfile,  Menu::NullItem, menu_editNumericalValue);
