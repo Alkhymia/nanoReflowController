@@ -378,6 +378,7 @@ void loop(void)
   if (menuUpdateRequest) {
     menuUpdateRequest = false;
     if (currentState < UIMenuEnd && !encMovement && currentState != Edit && previousState != Edit) { // clear menu on child/parent navigation
+//    if (currentState == Manual || (currentState < UIMenuEnd && !encMovement && currentState != Edit && previousState != Edit)) { // clear menu on child/parent navigation
       tft.fillScreen(ST7735_WHITE);
     }  
     MenuEngine.render(renderMenuItem, menuItemsVisible);
@@ -696,7 +697,7 @@ void loop(void)
     heaterSetpoint = encAbsolute;
     myPID.Compute();
     heaterPower = heaterOutput;
-//      Serial.print("Manual Heating:");Serial.println(powerHeater);
+    Serial.print("Manual Heating:");Serial.println(powerHeater);
   } else {
     heaterPower = 0;
   }

@@ -378,36 +378,34 @@ bool menu_editNumericalValue(const Menu::Action_t action) {
 }
 
 bool menu_manualHeating(const Menu::Action_t action) {
-  if (action == Menu::actionDisplay) {
-    bool initial = currentState != Edit;
-    currentState = Edit;
-
-    tft.setTextSize(1);
-    if (initial) {
-      tft.setTextColor(ST7735_BLACK, ST7735_WHITE);
-      tft.setCursor(MENU_TEXT_XPOS, 80);
-      tft.print("click to stop.");
+  bool init=true;
+  if ((init=((action == Menu::actionTrigger || action == Menu::actionDisplay) && currentState != Edit)) || action == Menu::actionDisplay) {
+    if (init) {
+      currentState = Edit;
+      tft.fillRect(20, 20, 120, 80, ST7735_RED);
+      tft.setTextSize(1);
+      tft.setTextColor(ST7735_WHITE, ST7735_RED);
+      tft.setCursor(40, 80);
+      tft.print("click to stop");
+      tft.setTextSize(2);
+      tft.setCursor(100,40);
+      tft.print("\367C");
       Encoder.setAccelerationEnabled(true);
-      Serial.println("inital");
+      encAbsolute = actualTemperature;
     }
-  
     if (encAbsolute > 250) encAbsolute = 250;
     if (encAbsolute <  0) encAbsolute =  0;
 
-    tft.setCursor(10, 60);
-    tft.print("Temp:  ");
+    tft.setCursor(45, 40);
+    tft.setTextSize(3);
     tft.setTextColor(ST7735_WHITE, ST7735_RED);
+    alignRightPrefix(encAbsolute);
     tft.print(encAbsolute);
-    tft.setTextColor(ST7735_BLACK, ST7735_WHITE);    
-    tft.print("\367C  ");
-  }
-  else if ((action == Menu::actionParent || action == Menu::actionTrigger ) && currentState == Edit) 
-  {
+  } else if ((action == Menu::actionParent || action == Menu::actionTrigger ) && currentState == Edit) {
     currentState = Settings;
     clearLastMenuItemRenderState();
   }
   return true;
-  
 }
 
 // ----------------------------------------------------------------------------

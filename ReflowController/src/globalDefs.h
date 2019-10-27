@@ -52,6 +52,7 @@ typedef enum {
   Idle     = 1,
   Settings = 2,
   Edit     = 3,
+  Manual   = 4,
 
   UIMenuEnd = 9,
 
