@@ -78,16 +78,7 @@ void killRelayPins(void) {
   digitalHigh(PIN_HEATER);
 }
 
-void saveProfile(unsigned int targetProfile, bool quiet) {
-  activeProfileId = targetProfile;
 
-  if (!quiet) {
-    memoryFeedbackScreen(activeProfileId, false);
-  }
-  saveParameters(activeProfileId); // activeProfileId is modified by the menu code directly, this method is called by a menu action
-
-  if (!quiet) delay(500);
-}
 
 #define WITH_CHECKSUM 1
 
@@ -352,7 +343,7 @@ void loop(void)
 
     case ClickEncoder::DoubleClicked:
       if (currentState < UIMenuEnd) {
-        if (MenuEngine.getParent() != &miExit) {
+        if (MenuEngine.getParent() != &miExit || currentState == Edit) {
           MenuEngine.navigate(MenuEngine.getParent());
           menuUpdateRequest = true;
         }
@@ -694,10 +685,15 @@ void loop(void)
     heaterPower = tuner.tunePID(actualTemperature);
     while (millis() - milliseconds < 100) delay(1);
   } else if (currentState == Edit && MenuEngine.currentItem==&miManual) {
+    if(stateChanged) {
+      myPID.SetMode(AUTOMATIC);
+      myPID.SetControllerDirection(DIRECT);
+      myPID.SetTunings(heaterPID.soakKp, heaterPID.soakKi, heaterPID.soakKd);
+      stateChanged = false;
+    }
     heaterSetpoint = encAbsolute;
     myPID.Compute();
     heaterPower = heaterOutput;
-    Serial.print("Manual Heating:");Serial.println(powerHeater);
   } else {
     heaterPower = 0;
   }

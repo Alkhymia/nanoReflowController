@@ -97,7 +97,7 @@ void displaySplash() {
   tft.setCursor(0, 109);
   tft.print("(c)2017 Dasaki");
   tft.setCursor(0, 119);
-  tft.print("(c)2019 Gaggi");
+  tft.print("(c)2019 gaGGi");
   delay(3000);
 }
 
@@ -305,9 +305,10 @@ bool menu_editNumericalValue(const Menu::Action_t action) {
 
     tft.setTextSize(1);
     if (initial) {
-      tft.setTextColor(ST7735_BLACK, ST7735_WHITE);
-      tft.setCursor(MENU_TEXT_XPOS, 80);
-      tft.print("Edit & click to save.");
+      tft.fillRect(15, 85, 132, 18, ST7735_RED);
+      tft.setTextColor(ST7735_WHITE, ST7735_RED);
+      tft.setCursor(22, 90);
+      tft.print("Edit & click to save");
       Encoder.setAccelerationEnabled(true);
     }
 
@@ -359,7 +360,7 @@ bool menu_editNumericalValue(const Menu::Action_t action) {
     clearLastMenuItemRenderState();
     menuUpdateRequest = true;
     MenuEngine.lastInvokedItem = &Menu::NullItem;
-
+    tft.fillScreen(ST7735_WHITE);
 
     if (currentState == Edit) { // leave edit mode, return to menu
       if (isPidSetting(MenuEngine.currentItem)) {
@@ -386,7 +387,7 @@ bool menu_manualHeating(const Menu::Action_t action) {
       tft.setTextSize(1);
       tft.setTextColor(ST7735_WHITE, ST7735_RED);
       tft.setCursor(40, 80);
-      tft.print("click to stop");
+      tft.print("Click to stop");
       tft.setTextSize(2);
       tft.setCursor(100,40);
       tft.print("\367C");
@@ -402,6 +403,7 @@ bool menu_manualHeating(const Menu::Action_t action) {
     alignRightPrefix(encAbsolute);
     tft.print(encAbsolute);
   } else if ((action == Menu::actionParent || action == Menu::actionTrigger ) && currentState == Edit) {
+    tft.fillScreen(ST7735_WHITE);
     currentState = Settings;
     clearLastMenuItemRenderState();
   }
@@ -447,11 +449,12 @@ bool menu_factoryReset(const Menu::Action_t action) {
     currentState = Edit;
 
     if (initial) { // TODO: add eyecandy: colors or icons
-      tft.setTextColor(ST7735_BLACK, ST7735_WHITE);
+      tft.fillRect(15, 75, 130, 30, ST7735_RED);
+      tft.setTextColor(ST7735_WHITE, ST7735_RED);
       tft.setTextSize(1);
-      tft.setCursor(10, tft.height() - 38);
+      tft.setCursor(22, 80);
       tft.print("Click to confirm");
-      tft.setCursor(10, tft.height() - 28);
+      tft.setCursor(22, 90);
       tft.print("Doubleclick to exit");
     }
   }
@@ -465,6 +468,7 @@ bool menu_factoryReset(const Menu::Action_t action) {
 
   if (action == Menu::actionParent) {
     if (currentState == Edit) { // leave edit mode only, returning to menu
+      tft.fillScreen(ST7735_WHITE);
       currentState = Settings;
       clearLastMenuItemRenderState();
       return false;
@@ -484,34 +488,27 @@ void memoryFeedbackScreen(uint8_t profileId, bool loading) {
   tft.print(profileId);  
 }
 
-// ----------------------------------------------------------------------------
+void saveProfile(unsigned int targetProfile, bool quiet) {
+  activeProfileId = targetProfile;
 
-void saveProfile(unsigned int targetProfile, bool quiet = false);
+  if (!quiet) {
+    memoryFeedbackScreen(activeProfileId, false);
+  }
+  saveParameters(activeProfileId); // activeProfileId is modified by the menu code directly, this method is called by a menu action
 
+  if (!quiet) delay(500);
+}
 
 void loadProfile(unsigned int targetProfile) {
-  memoryFeedbackScreen(activeProfileId, true);
+  memoryFeedbackScreen(targetProfile, true);
   //bool ok = loadParameters(targetProfile);
   loadParameters(targetProfile);
 
-#if 0
-  if (!ok) {
-    lcd.setCursor(0, 2);
-    lcd.print("Checksum error!");
-    lcd.setCursor(0, 3);
-    lcd.print("Review profile.");
-    delay(2500);
-  }
-#endif
-
-  // save in any way, as we have no undo
   activeProfileId = targetProfile;
   saveLastUsedProfile();
 
   delay(500);
 }
-
-// ----------------------------------------------------------------------------
 
 bool menu_saveLoadProfile(const Menu::Action_t action) {
   bool isLoad = MenuEngine.currentItem == &miLoadProfile;
@@ -520,34 +517,40 @@ bool menu_saveLoadProfile(const Menu::Action_t action) {
     bool initial = currentState != Edit;
     currentState = Edit;
 
-    tft.setTextColor(ST7735_BLACK, ST7735_WHITE);
+    tft.setTextColor(ST7735_WHITE, ST7735_RED);
     tft.setTextSize(1);
 
     if (initial) {
       encAbsolute = activeProfileId;      
-      tft.setCursor(10, 90);
+      tft.fillRect(15, 75, 130, 30, ST7735_RED);
+      tft.setTextColor(ST7735_WHITE, ST7735_RED);
+      tft.setCursor(22, 90);
       tft.print("Doubleclick to exit");
     }
 
     if (encAbsolute > maxProfiles) encAbsolute = maxProfiles;
     if (encAbsolute <  0) encAbsolute =  0;
 
-    tft.setCursor(10, 80);
+    tft.setCursor(22, 80);
     tft.print("Click to ");
-    tft.print((isLoad) ? "load " : "save ");
-    tft.setTextColor(ST7735_WHITE, ST7735_RED);
+    tft.print((isLoad) ? "load" : "save");
+    //tft.setTextColor(ST7735_WHITE, ST7735_RED);
+    alignRightPrefix(encAbsolute);
     tft.print(encAbsolute);
   }
 
   if (action == Menu::actionTrigger) {
-    (isLoad) ? loadProfile(encAbsolute) : saveProfile(encAbsolute);
+    Serial.println("actionTrigger");
+    (isLoad) ? loadProfile(encAbsolute) : saveProfile(encAbsolute, false);
     tft.fillScreen(ST7735_WHITE);
     MenuEngine.navigate(MenuEngine.getParent());
     return false;
   }
 
   if (action == Menu::actionParent) {    
+    Serial.println("actionParent");
     if (currentState == Edit) { // leave edit mode only, returning to menu
+      tft.fillScreen(ST7735_WHITE);
       currentState = Settings;
       clearLastMenuItemRenderState();
       return false;
